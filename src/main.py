@@ -54,10 +54,6 @@ def main():
     for pdf_path, doc_type in classified_pdfs:
         print(f" - {pdf_path.name}: {doc_type}")
 
-        if pdf_path.name == "rechnung.pdf":
-            text = extract_text_from_pdf(pdf_path)
-            with open("debug_rechnung_20002.txt", "w", encoding="utf-8") as f:
-                f.write(text)
 
     # Meldezettel verarbeiten
     melde_result = None

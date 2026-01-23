@@ -4,12 +4,12 @@ from pypdf import PdfReader
 from pdf2image import convert_from_path
 import pytesseract
 
-# Nur lokal unter Windows spezielle Pfade setzen
 if os.name == "nt":
-    POPPLER_PATH = r"C:\Program Files\poppler-24.02.0\Library\bin"
+    POPPLER_PATH = r"C:\poppler-25.12.0\Library\bin"  # hier deinen exakten Pfad
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 else:
-    POPPLER_PATH = None  # in der Cloud: Poppler kommt aus packages.txt, Tesseract aus dem System
+    POPPLER_PATH = None
+
 
 
 def extract_text_from_pdf(path: Path) -> str:

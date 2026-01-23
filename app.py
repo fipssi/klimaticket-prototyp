@@ -1,8 +1,17 @@
+import shutil, subprocess, streamlit as st
+
+st.write("which tesseract:", shutil.which("tesseract"))
+try:
+    st.code(subprocess.check_output(["tesseract", "--version"], text=True))
+except Exception as e:
+    st.write("tesseract --version failed:", repr(e))
+
 import os
 from pathlib import Path
 import tempfile
 
 import streamlit as st
+
 
 # Module aus deinem Projekt
 from src.document_classifier import classify_document
