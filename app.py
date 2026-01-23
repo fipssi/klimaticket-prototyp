@@ -1,11 +1,3 @@
-import shutil, subprocess, streamlit as st
-
-st.write("which tesseract:", shutil.which("tesseract"))
-try:
-    st.code(subprocess.check_output(["tesseract", "--version"], text=True))
-except Exception as e:
-    st.write("tesseract --version failed:", repr(e))
-
 import os
 from pathlib import Path
 import tempfile
@@ -58,69 +50,82 @@ uploaded_files = st.file_uploader(
 # ---------------------------------------------------------
 # Button löst „Prüfen“-Logik aus
 # ---------------------------------------------------------
+# Wenn der Benutzer auf den Button klickt, startet die gesamte Prüf-Logik
 if st.button("Prüfen"):
-    # 1) form_data wie antrag.json aufbauen
-    form_data = {
-        "antrags_id": "TEST-UI",   # Platzhalter
-        "intern_id": "UI-0001",    # Platzhalter
-        "familienname": nachname,
-        "vorname": vorname,
-        "strasse": "",             # optional: eigenes Feld hinzufügen
-        "plz": plz,
-        "geburtsdatum": geburtsdatum,
-        "ticket_typ": ticket_typ,
-        "gilt_von": gilt_von,
-        "gilt_bis": gilt_bis,
-    }
+    # Spinner zeigt im UI: „Dokumente werden geprüft ...“ solange der Block läuft
+    with st.spinner("Dokumente werden geprüft ..."):
+        # 1) Formulardaten aus den Eingabefeldern in ein dict packen
+        form_data = {
+            "antrags_id": "TEST-UI",   # Platzhalter-ID für den Demo-Antrag
+            "intern_id": "UI-0001",    # interne Referenz, hier nur Demo
+            "familienname": nachname,  # Nachname aus Textfeld
+            "vorname": vorname,        # Vorname aus Textfeld
+            "strasse": "",             # aktuell noch nicht im UI abgefragt
+            "plz": plz,                # PLZ aus Textfeld
+            "geburtsdatum": geburtsdatum,  # Geburtsdatum im ISO-Format
+            "ticket_typ": ticket_typ,      # z.B. „Classic“ aus Textfeld
+            "gilt_von": gilt_von,          # Beginn des Ticket-Zeitraums
+            "gilt_bis": gilt_bis,          # Ende des Ticket-Zeitraums
+        }
 
-    # Formulardaten zur Kontrolle anzeigen
-    st.subheader("Formulardaten (form_data)")
-    st.json(form_data)
+        # Die gesammelten Formulardaten zur Kontrolle im UI anzeigen
+        st.subheader("Formulardaten (form_data)")
+        st.json(form_data)
 
-    # 2) Uploads in ein temporäres Verzeichnis speichern
-    st.subheader("Hochgeladene Dateien")
-    st.write("Anzahl:", len(uploaded_files))
+        # 2) Hochgeladene Dateien anzeigen und sicherstellen, dass überhaupt welche da sind
+        st.subheader("Hochgeladene Dateien")
+        st.write("Anzahl:", len(uploaded_files))
 
-    if not uploaded_files:
-        st.warning(
-            "Es wurden keine Dokumente hochgeladen. "
-            "Bitte Meldebestätigung und Klimaticket-Rechnung(en) als PDF hochladen."
-        )
-        # Ohne Dokumente keine weitere Verarbeitung
-        st.stop()
+        # Wenn keine Dateien hochgeladen wurden, Hinweis anzeigen und Verarbeitung abbrechen
+        if not uploaded_files:
+            st.warning(
+                "Es wurden keine Dokumente hochgeladen. "
+                "Bitte Meldebestätigung und Klimaticket-Rechnung(en) als PDF hochladen."
+            )
+            # bricht nur den Button-Handler ab, nicht die ganze App
+            st.stop()
 
-    # Temporären Ordner anlegen
-    temp_dir = tempfile.mkdtemp()
-    st.write("TEMP-Verzeichnis:", temp_dir)
+        # 3) Temporäres Verzeichnis anlegen, in dem alle Uploads für diese Sitzung gespeichert werden
+        temp_dir = tempfile.mkdtemp()
+        st.write("TEMP-Verzeichnis:", temp_dir)
 
-    # Pfade der gespeicherten PDFs sammeln
-    paths: list[Path] = []
+        # Liste, in der die Pfade zu allen gespeicherten PDFs gesammelt werden
+        paths: list[Path] = []
 
-    for f in uploaded_files:
-        save_path = Path(temp_dir) / f.name
+        # Jede hochgeladene Datei aus dem Streamlit-Upload-Objekt auf die Festplatte schreiben
+        for f in uploaded_files:
+            save_path = Path(temp_dir) / f.name
 
-        # Dateiinhalt auf Platte schreiben
-        with open(save_path, "wb") as out:
-            out.write(f.read())
+            # Binären Inhalt des Uploads in die Datei schreiben
+            with open(save_path, "wb") as out:
+                out.write(f.read())
 
-        st.write("- gespeichert als:", str(save_path))
-        paths.append(save_path)
+            st.write("- gespeichert als:", str(save_path))
+            paths.append(save_path)
 
-    # 3) PDFs klassifizieren -> list[tuple[Path, str]]
-    classified_pdfs: list[tuple[Path, str]] = []
-    for pdf_path in paths:
-        text = extract_text_from_pdf(pdf_path)
-        doc_type = classify_document(text)
-        classified_pdfs.append((pdf_path, doc_type))
-        st.write(f"Dokument {pdf_path.name} klassifiziert als: {doc_type}")
+        # 4) Alle gespeicherten PDFs einlesen und klassifizieren
+        classified_pdfs: list[tuple[Path, str]] = []
+        for pdf_path in paths:
+            # Text aus dem PDF holen (inkl. OCR, falls nötig)
+            text = extract_text_from_pdf(pdf_path)
+            # Dokumenttyp (meldezettel, jahresrechnung, ...) per ML-Modell bestimmen
+            doc_type = classify_document(text)
+            # Pfad + erkannter Typ speichern
+            classified_pdfs.append((pdf_path, doc_type))
+            st.write(f"Dokument {pdf_path.name} klassifiziert als: {doc_type}")
 
-    # 4) Decision Engine aufrufen (nur EINMAL)
-    overall_decision = build_overall_decision(form_data, classified_pdfs)
+        # 5) Decision Engine aufrufen, die aus form_data + klassifizierten PDFs
+        #    die Gesamtförderentscheidung berechnet
+        overall_decision = build_overall_decision(form_data, classified_pdfs)
 
-    # Ergebnis + Dokumente im Session-State speichern,
-    # damit sie nach einem erneuten Rendern erhalten bleiben
-    st.session_state["decision"] = overall_decision
-    st.session_state["classified_pdfs"] = classified_pdfs
+        # 6) Ergebnis im Session-State ablegen, damit es auch nach einem Re-Render
+        #    noch zur Verfügung steht
+        st.session_state["decision"] = overall_decision
+        st.session_state["classified_pdfs"] = classified_pdfs
+
+    # Dieser Code läuft NACH dem Spinner-Block, wenn alles fertig verarbeitet ist
+    st.success("Prüfung abgeschlossen.")
+
 
 # ---------------------------------------------------------
 # Ergebnis-Anzeige + „Antrag absenden“-Button
