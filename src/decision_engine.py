@@ -72,9 +72,9 @@ def build_invoice_decision(form_data: dict,
     zahlung_ok = False              # Ist diese Zahlungsbestätigung inhaltlich korrekt?
     zahlung_details = None          # Detail-Dict für Debug/Sachbearbeitung
 
-    # Zähler für Monatsrechnungen
-    monats_found = 0                # Wie viele Monatsrechnungen wurden gefunden?
-    monats_valid = 0                # Wie viele davon waren gültig?
+    # Zähler / Set für Monatsrechnungen
+    monats_found = 0  # Wie viele Monatsrechnungen wurden gefunden?
+    valid_months: set[str] = set()  # Für wie viele unterschiedliche Monate haben wir eine gültige Monatsrechnung?
 
     # Über alle klassifizierten PDFs iterieren
     for pdf_path, doc_type in classified_pdfs:
@@ -102,14 +102,20 @@ def build_invoice_decision(form_data: dict,
             zahlung_ok = bool(z_res.get("all_ok"))
 
         elif doc_type == "monatsrechnung":
-            # Jede gefundene Monatsrechnung zählen
             monats_found += 1
             m_res = validate_monatsrechnung(form_data, text)
-            # Monatsrechnung zählt nur, wenn alles ok ist (inkl. Name)
-            if m_res.get("all_ok"):
-                monats_valid += 1
 
-    # Monatsrechnungen gelten als ausreichend, wenn mindestens 3 gültig sind
+            # Nur Monatsrechnungen zählen, die fachlich ok sind
+            if m_res.get("all_ok"):
+                month_key = m_res.get("leist_month_key")
+                # Set sorgt dafür, dass doppelte Monate nur einmal zählen
+                if month_key:
+                    valid_months.add(month_key)
+
+    # Anzahl unterschiedlicher Monate mit gültigen Monatsrechnungen
+    monats_valid = len(valid_months)
+
+    # Monatsrechnungen reichen aus, wenn mindestens 3 verschiedene Monate abgedeckt sind
     monats_ok = monats_valid >= 3
 
     # Aktuelle Entscheidungsregel:

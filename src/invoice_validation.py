@@ -572,77 +572,96 @@ def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) ->
     - Leistungszeitraum prüfen (liegt innerhalb der Gültigkeit)
 
     Rückgabe (dict):
-    - name_ok: bool
-    - name_context: Chunk um den Marker (für Decision Engine / Debug)
-    - guelt_ok: bool
-    - leist_ok: bool
-    - guelt_pdf_raw / guelt_pdf_iso / form_iso
-    - leistungszeitraum_iso
-    - all_ok: bool
+    - name_ok: bool                 -> Karteninhaber passt zum Antrag
+    - name_context: str | None      -> Textausschnitt um "Karteninhaber" (für Debug/UI)
+    - guelt_ok: bool                -> Gültigkeit der Rechnung = Gültigkeit im Antrag
+    - leist_ok: bool                -> Leistungszeitraum liegt innerhalb der Gültigkeit
+    - guelt_pdf_raw / guelt_pdf_iso -> Gültigkeitsdaten aus der Rechnung (roh/ISO)
+    - form_iso                      -> Gültigkeitsdaten aus dem Antrag (ISO)
+    - leistungszeitraum_iso         -> Leistungszeitraum der Monatsrechnung (ISO)
+    - leist_month_key: str | None   -> Jahr-Monat des Leistungsbeginns (z.B. "2024-09")
+    - all_ok: bool                  -> Gesamtflag für diese Monatsrechnung
     """
 
-    # --- Name robust: im Umfeld von "Karteninhaber" ---
+    # --- 1) Name prüfen: kommt Vor- und Nachname im Umfeld von "Karteninhaber" vor? ---
     name_ok, name_context = name_match_near_markers(
         text,
         form_data.get("vorname", ""),
         form_data.get("familienname", ""),
-        markers=[ (["karteninhaber"], 12) ],
+        markers=[ (["karteninhaber"], 12) ],  # 12 Zeilen nach dem Marker in den Chunk nehmen
     )
 
-    # --- Gültigkeit ---
+    # --- 2) Gültigkeit (Jahreszeitraum der Karte) prüfen ---
+    # Aus der Rechnung den Gültigkeitszeitraum (oder "Gültigkeit") herausziehen
     g_von_s, g_bis_s = extract_period_from_rechnung(text)
-    g_von = parse_pdf_date_dot(g_von_s)
-    g_bis = parse_pdf_date_dot(g_bis_s)
+    g_von = parse_pdf_date_dot(g_von_s)   # Beginn als datetime
+    g_bis = parse_pdf_date_dot(g_bis_s)   # Ende als datetime
 
+    # Aus dem Antrag den erwarteten Gültigkeitszeitraum laden
     a_von = parse_form_datetime(form_data.get("gilt_von", ""))
     a_bis = parse_form_datetime(form_data.get("gilt_bis", ""))
 
+    # Gültigkeit ist ok, wenn beide Seiten gesetzt sind und exakt übereinstimmen
     guelt_ok = (
         g_von is not None and g_bis is not None
         and g_von.date() == a_von.date()
         and g_bis.date() == a_bis.date()
     )
 
-    # --- Leistungszeitraum (Monat) ---
+    # --- 3) Leistungszeitraum (ein einzelner Abrechnungsmonat) prüfen ---
     # Viele Monatsrechnungen haben "Leistungszeitraum: DD.MM.YYYY - DD.MM.YYYY"
     lines = text.splitlines()
-    l_von = l_bis = None
+    l_von = l_bis = None  # Start/Ende des Leistungszeitraums
 
     for i, line in enumerate(lines):
+        # Zeile suchen, die mit "Leistungszeitraum" beginnt (nach Normalisierung)
         if normalize_for_matching(line).startswith("leistungszeitraum"):
+            # Ein paar Zeilen um diese Zeile herum zusammenfassen
             chunk = " ".join(lines[i:i + 5])
+            # Zwei Datumswerte im Format DD.MM.YYYY (mit OCR-Toleranz) suchen
             m = re.search(rf"({DATE_PATTERN_DOT})\s*-\s*({DATE_PATTERN_DOT})", chunk)
             if m:
                 l_von = parse_pdf_date_dot(m.group(1))
                 l_bis = parse_pdf_date_dot(m.group(2))
-            break
+            break  # nach dem ersten Treffer abbrechen
 
+    # Leistungszeitraum ist ok, wenn:
+    # - Start und Ende gefunden wurden
+    # - und komplett innerhalb der Gültigkeit des Tickets liegen
     leist_ok = (
         l_von is not None and l_bis is not None
         and a_von.date() <= l_von.date() <= l_bis.date() <= a_bis.date()
     )
 
+    # --- 4) Monats-Schlüssel für „einzigartige Monatsrechnung“ bauen ---
+    # Idee: Jahr-Monat des Leistungsbeginns, z.B. 2024-09 für 15.09.2024–14.10.2024
+    leist_month_key = None
+    if l_von is not None:
+        leist_month_key = f"{l_von.year:04d}-{l_von.month:02d}"
+
+    # --- 5) Ergebnis-Dict aufbauen ---
     result = {
         "doc_type": "monatsrechnung",
         "name_ok": bool(name_ok),
         "name_context": name_context,
         "guelt_ok": bool(guelt_ok),
         "leist_ok": bool(leist_ok),
-        "guelt_pdf_raw": {"von": g_von_s, "bis": g_bis_s},
+        "guelt_pdf_raw": {"von": g_von_s, "bis": g_bis_s},           # Rohtexte aus PDF
         "guelt_pdf_iso": {"von": _fmt_iso(g_von), "bis": _fmt_iso(g_bis)},
         "form_iso": {"von": a_von.date().isoformat(), "bis": a_bis.date().isoformat()},
         "leist_pdf_iso": {"von": _fmt_iso(l_von), "bis": _fmt_iso(l_bis)},
-        "all_ok": bool(name_ok and guelt_ok and leist_ok),
+        "leist_month_key": leist_month_key,                          # NEU: Monatsschlüssel
+        "all_ok": bool(name_ok and guelt_ok and leist_ok),           # Gesamtflag
     }
 
+    # --- 6) Optionale Debug-Ausgaben für Konsole ---
     if verbose:
         print("Name-Match Monatsrechnung (near Karteninhaber):", result["name_ok"])
-
         # Wunschformat wie bei dir: "15.09.2024 - 14.09.2025 -> True"
         print("Gültigkeit Monatsrechnung:",
               _fmt_dot(g_von), "-", _fmt_dot(g_bis), "->", result["guelt_ok"])
-
         print("Leistungszeitraum Monatsrechnung:",
               _fmt_dot(l_von), "-", _fmt_dot(l_bis), "->", result["leist_ok"])
+        print("Leistungs-Monatsschlüssel:", leist_month_key)
 
     return result
