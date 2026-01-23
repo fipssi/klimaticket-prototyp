@@ -180,7 +180,7 @@ if decision is not None:
         if 0 < monats_valid < 3:
             st.error(
                 f"Es wurden nur {monats_valid} gültige Monatsrechnungen erkannt. "
-                "Für die Förderung müssen mindestens 3 Monatsrechnungen hochgeladen werden."
+                "Für die Förderung müssen mindestens 3 unterschiedliche Monatsrechnungen innerhalb des Gültigkeitszeitraum des KlimaTicket hochgeladen werden."
             )
         else:
             st.error(
