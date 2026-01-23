@@ -93,6 +93,7 @@ _LABELS = {
     "familienname oder nachname",
     "nachname",
     "vorname",
+    "vomame",  # OCR-Fehler-Variante für Vorname
     "geschlecht",
     "geburtsdatum",
     "geburtsort",
