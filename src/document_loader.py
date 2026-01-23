@@ -1,44 +1,60 @@
-#Funktion zum auslesen von PDFS
+import os
 from pathlib import Path
 from pypdf import PdfReader
-from pdf2image import convert_from_path  # wandelt PDF-Seiten in Bilder um
-import pytesseract  # Python-Wrapper für die Tesseract-OCR-Engine
+from pdf2image import convert_from_path
+import pytesseract
 
-POPPLER_PATH = r"C:\poppler-25.12.0\Library\bin"  # für pdf2image wichtig
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Nur lokal unter Windows spezielle Pfade setzen
+if os.name == "nt":
+    POPPLER_PATH = r"C:\Program Files\poppler-24.02.0\Library\bin"
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:
+    POPPLER_PATH = None  # in der Cloud: Poppler kommt aus packages.txt, Tesseract aus dem System
 
 
 def extract_text_from_pdf(path: Path) -> str:
     """
     Liest Text aus einer PDF-Datei.
-    - Zuerst wird versucht, normalen (digitalen) Text aus den Seiten zu extrahieren.
-    - Wenn eine Seite keinen Text enthält (z.B. Scan/Bild-PDF),
-      wird ein OCR-Fallback verwendet: Seite -> Bild -> Tesseract-OCR -> Text.
+
+    Strategie:
+    1. Erst versuchen, normalen (eingebetteten) Text aus den PDF-Seiten zu lesen.
+    2. Wenn auf einer Seite kein Text vorhanden ist (typisch bei Scan-/Bild-PDFs),
+       wird als Fallback OCR mit Tesseract verwendet.
     """
+    # PdfReader öffnet das PDF und erlaubt Zugriff auf einzelne Seiten
     reader = PdfReader(path)
     parts: list[str] = []
 
+    # Jede Seite nacheinander verarbeiten
     for page in reader.pages:
-        # 1. Versuch: eingebetteten Text direkt aus der Seite holen
+        # 1. Versuch: eingebetteten Text direkt aus der PDF-Seite holen
         text = page.extract_text()
 
         if text:
-            # Falls normaler Text gefunden wurde, anhängen
+            # Fall „digitales PDF“: Text wurde gefunden → einfach anhängen
             parts.append(text)
         else:
-            # Kein Text → vermutlich Bild-PDF → OCR verwenden
-            # convert_from_path rendert alle Seiten des PDFs als Bild.
-            # (In einfachen Fällen: ganze Datei noch einmal als Bilder laden.)
-            images = convert_from_path(str(path), poppler_path=POPPLER_PATH)
+            # Fall „Scan-/Bild-PDF“: kein eingebetteter Text vorhanden
+            # → komplette Datei (oder alle Seiten) als Bilder rendern
+
+            if POPPLER_PATH:
+                # Lokal unter Windows: Poppler muss über POPPLER_PATH gefunden werden
+                images = convert_from_path(str(path), poppler_path=POPPLER_PATH)
+            else:
+                # In der Cloud / auf Linux: Poppler kommt aus dem System-PATH,
+                # daher ohne poppler_path-Parameter aufrufen
+                images = convert_from_path(str(path))
 
             ocr_text_parts: list[str] = []
+
+            # Über alle gerenderten Seitenbilder iterieren
             for img in images:
-                # pytesseract liest Text aus dem Bild heraus
+                # Tesseract-OCR liest Text aus dem Bild heraus
                 ocr_text = pytesseract.image_to_string(img)
                 ocr_text_parts.append(ocr_text)
 
-            # Text aller OCR-Seiten zusammenfügen und als Fallback anhängen
+            # Alle OCR-Texte der Seiten zu einem String zusammenfassen
             parts.append("\n".join(ocr_text_parts))
 
-    # Alle Seiten-Texte (direkt oder OCR) zu einem String zusammenfügen
+    # Am Ende: alle Seiten-Texte (direkt + OCR) zu einem einzigen großen Text verbinden
     return "\n".join(parts)
