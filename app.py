@@ -9,6 +9,7 @@ import streamlit as st
 from src.document_classifier import classify_document
 from src.document_loader import extract_text_from_pdf
 from src.decision_engine import build_overall_decision
+from src.registration_validation import is_postcode_foerderberechtigt
 
 # Session-State initialisieren:
 # - decision: speichert das Ergebnis der Decision Engine
@@ -46,6 +47,13 @@ uploaded_files = st.file_uploader(
     type=["pdf"],
     accept_multiple_files=True,
 )
+
+# Hinweis direkt beim Ausfüllen anzeigen
+if plz and not is_postcode_foerderberechtigt(plz):
+    st.warning(
+        "Nur Bürger:innen, die ihren Hauptwohnsitz in der Stadt Salzburg haben, "
+        "sind für diese Förderung berechtigt."
+    )
 
 # ---------------------------------------------------------
 # Button löst „Prüfen“-Logik aus

@@ -43,7 +43,7 @@ def load_case(case_id: str) -> dict:
     return form_data
 
 def main():
-    case_id = "20001"
+    case_id = "000_fingerlos"
     case_dir = CASES_DIR / case_id
     form_data = load_case(case_id)
 

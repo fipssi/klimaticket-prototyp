@@ -513,7 +513,17 @@ def validate_meldezettel(form_data: dict, melde_text: str, verbose: bool = False
         melde_geburtsdatum_iso
     )
 
-    plz_ok = (current_plz is not None) and is_postcode_foerderberechtigt(current_plz)
+    current_plz = extract_current_main_residence_postal_code(melde_text)
+    form_plz = (form_data.get("plz") or "").strip()
+
+    # PLZ aus Meldezettel muss förderberechtigt sein
+    plz_ok_melde = (current_plz is not None) and is_postcode_foerderberechtigt(current_plz)
+
+    # PLZ im Formular muss exakt mit der Meldezettel-PLZ übereinstimmen
+    plz_ok_form = bool(current_plz and form_plz and current_plz == form_plz)
+
+    # Gesamt-PLZ-Check: beides muss stimmen
+    plz_ok = plz_ok_melde and plz_ok_form
 
     result: Dict[str, Any] = {
         "doc_type": "meldezettel",
@@ -531,6 +541,8 @@ def validate_meldezettel(form_data: dict, melde_text: str, verbose: bool = False
             "nachname_ok": bool(nachname_ok),
             "geburtsdatum_ok": bool(geburtsdatum_ok),
             "plz_ok": bool(plz_ok),
+            "plz_ok_melde": bool(plz_ok_melde),  # NEU
+            "plz_ok_form": bool(plz_ok_form),  # NEU
         },
         "all_ok": bool(vorname_ok and nachname_ok and geburtsdatum_ok and plz_ok),
     }
@@ -545,6 +557,8 @@ def validate_meldezettel(form_data: dict, melde_text: str, verbose: bool = False
         print("DEBUG melde_vorname_full:", melde_vorname_full)
         print("DEBUG melde_geburtsdatum_iso:", melde_geburtsdatum_iso)
         print("DEBUG form_geburtsdatum_iso:", form_geburtsdatum_iso)
+        print("PLZ (Meldezettel) förderberechtigt:", plz_ok_melde)
+        print("PLZ Formular = PLZ Meldezettel:", plz_ok_form)
 
     return result
 
