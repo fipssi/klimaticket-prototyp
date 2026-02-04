@@ -1,75 +1,75 @@
-"""
-invoice_validation.py — Validierung von KlimaTicket-Rechnungsdokumenten
+﻿"""
+invoice_validation.py â€” Validierung von KlimaTicket-Rechnungsdokumenten
 =======================================================================
 
-ÜBERBLICK
+ÃœBERBLICK
 ---------
 Dieses Modul validiert die INHALTLICHEN Daten von Rechnungsdokumenten
 gegen die Antragsdaten. Es ist der dritte Schritt in der Pipeline:
 
-    PDF → document_loader → Text
-    Text → document_classifier → ("jahresrechnung", 0.92)
-    Text + Antragsdaten → invoice_validation → {name_ok, period_ok, ...}  ← HIER
-    Alle Ergebnisse → decision_engine → Gesamtentscheidung
+    PDF â†’ document_loader â†’ Text
+    Text â†’ document_classifier â†’ ("jahresrechnung", 0.92)
+    Text + Antragsdaten â†’ invoice_validation â†’ {name_ok, period_ok, ...}  â† HIER
+    Alle Ergebnisse â†’ decision_engine â†’ Gesamtentscheidung
 
 
 DREI DOKUMENTTYPEN WERDEN VALIDIERT
 ------------------------------------
 Jeder Typ hat eine eigene Validierungsfunktion:
 
-    ┌──────────────────────────────┬────────────────────────────────┐
-    │ Dokumenttyp                  │ Validierungsfunktion           │
-    ├──────────────────────────────┼────────────────────────────────┤
-    │ Jahresrechnung               │ validate_rechnung()            │
-    │ Monatsrechnung               │ validate_monatsrechnung()      │
-    │ Zahlungsbestätigung          │ validate_zahlungsbestaetigung()│
-    └──────────────────────────────┴────────────────────────────────┘
+    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+    â”‚ Dokumenttyp                  â”‚ Validierungsfunktion           â”‚
+    â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+    â”‚ Jahresrechnung               â”‚ validate_rechnung()            â”‚
+    â”‚ Monatsrechnung               â”‚ validate_monatsrechnung()      â”‚
+    â”‚ ZahlungsbestÃ¤tigung          â”‚ validate_zahlungsbestaetigung()â”‚
+    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-    Alle drei prüfen:
-        1. NAME:    Stimmt der Karteninhaber mit dem Antrag überein?
-        2. ZEITRAUM: Stimmt der Gültigkeitszeitraum mit dem Antrag überein?
+    Alle drei prÃ¼fen:
+        1. NAME:    Stimmt der Karteninhaber mit dem Antrag Ã¼berein?
+        2. ZEITRAUM: Stimmt der GÃ¼ltigkeitszeitraum mit dem Antrag Ã¼berein?
 
-    Zusätzlich bei Jahres-/Monatsrechnungen:
-        3. LEISTUNGSZEITRAUM: Liegt er innerhalb der Gültigkeit?
+    ZusÃ¤tzlich bei Jahres-/Monatsrechnungen:
+        3. LEISTUNGSZEITRAUM: Liegt er innerhalb der GÃ¼ltigkeit?
 
 
-NAMENS-MATCHING — WARUM SO KOMPLEX?
+NAMENS-MATCHING â€” WARUM SO KOMPLEX?
 -------------------------------------
 Das Matching von Namen ist das schwierigste Problem in diesem Modul,
 weil OCR-Text und Antragsdaten auf viele Weisen voneinander abweichen:
 
-    Problem                 │ Beispiel
-    ────────────────────────┼──────────────────────────────────
-    Umlaute / Transliteration│ "Jürgen" vs. "Juergen" vs. "Jurgen"
-    ß → ss                  │ "Größer" vs. "Groesser"
-    OCR ohne Leerzeichen    │ "MaxMichael" statt "Max Michael"
-    Bindestrich-Varianten   │ "Muster-Beispiel" vs. "Muster Beispiel"
-    Mehrfach-Vornamen       │ Antrag "Max", PDF "Max Michael"
-    Diakritika              │ "André" vs. "Andre"
-    ────────────────────────┼──────────────────────────────────
+    Problem                 â”‚ Beispiel
+    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    Umlaute / Transliterationâ”‚ "JÃ¼rgen" vs. "Juergen" vs. "Jurgen"
+    ÃŸ â†’ ss                  â”‚ "GrÃ¶ÃŸer" vs. "Groesser"
+    OCR ohne Leerzeichen    â”‚ "MaxMichael" statt "Max Michael"
+    Bindestrich-Varianten   â”‚ "Muster-Beispiel" vs. "Muster Beispiel"
+    Mehrfach-Vornamen       â”‚ Antrag "Max", PDF "Max Michael"
+    Diakritika              â”‚ "AndrÃ©" vs. "Andre"
+    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     Strategie: Wir "erraten" den Namen NICHT aus dem PDF (Gefahr: Firmenname
-    wie "One Mobility Ticketing GmbH" wird fälschlich als Name erkannt).
-    Stattdessen prüfen wir, ob der Name aus dem ANTRAG im Umfeld eines
+    wie "One Mobility Ticketing GmbH" wird fÃ¤lschlich als Name erkannt).
+    Stattdessen prÃ¼fen wir, ob der Name aus dem ANTRAG im Umfeld eines
     klaren Markers vorkommt:
         - Rechnungen:           "Karteninhaber"  (12 Zeilen Fenster)
-        - Zahlungsbestätigungen: "für"           (4 Zeilen Fenster)
+        - ZahlungsbestÃ¤tigungen: "fÃ¼r"           (4 Zeilen Fenster)
 
 
-ZEITRAUM-EXTRAKTION — OCR-ROBUSTHEIT
+ZEITRAUM-EXTRAKTION â€” OCR-ROBUSTHEIT
 --------------------------------------
-OCR-Text enthält typische Fehler bei Datumsangaben:
+OCR-Text enthÃ¤lt typische Fehler bei Datumsangaben:
 
-    "01 .04.2023"   → Leerzeichen vor dem Punkt
-    "31.O3.2024"    → Buchstabe O statt Ziffer 0
-    "1O.12.2024"    → O statt 0 mitten in einer Zahl
+    "01 .04.2023"   â†’ Leerzeichen vor dem Punkt
+    "31.O3.2024"    â†’ Buchstabe O statt Ziffer 0
+    "1O.12.2024"    â†’ O statt 0 mitten in einer Zahl
 
-    Alle diese Fälle werden von clean_date_dot() repariert.
+    Alle diese FÃ¤lle werden von clean_date_dot() repariert.
 
 
-ABHÄNGIGKEITEN
+ABHÃ„NGIGKEITEN
 --------------
-    utils.py  — normalize_for_matching(), _compact(), _variants_for_umlaut_translit()
+    utils.py  â€” normalize_for_matching(), _compact(), _variants_for_umlaut_translit()
                 (Shared Hilfsfunktionen, auch von registration_validation.py genutzt)
 """
 
@@ -80,7 +80,10 @@ import unicodedata
 from datetime import datetime
 from typing import Tuple, Optional
 
-from utils import normalize_for_matching, _compact, _variants_for_umlaut_translit
+try:
+    from src.utils import normalize_for_matching, _compact, _variants_for_umlaut_translit
+except ImportError:
+    from utils import normalize_for_matching, _compact, _variants_for_umlaut_translit
 
 
 # =============================================================================
@@ -88,26 +91,26 @@ from utils import normalize_for_matching, _compact, _variants_for_umlaut_transli
 # =============================================================================
 #
 # Kleine Helfer, die nur innerhalb dieses Moduls verwendet werden.
-# Sie sind mit _ prefixed, um zu signalisieren, dass sie nicht für
+# Sie sind mit _ prefixed, um zu signalisieren, dass sie nicht fÃ¼r
 # den Import durch andere Module gedacht sind.
 
 def _contains_marker(line_norm: str, marker: str) -> bool:
     """
-    Prüft robust, ob ein Marker-Wort in einer normalisierten Textzeile vorkommt.
+    PrÃ¼ft robust, ob ein Marker-Wort in einer normalisierten Textzeile vorkommt.
 
     Warum nicht einfach `marker in line`?
         OCR kann Buchstaben mit Leerzeichen trennen:
-            "für"  → "f ü r"  → nach Normalisierung: "f u r"
-            "gilt" → "g i l t"
+            "fÃ¼r"  â†’ "f Ã¼ r"  â†’ nach Normalisierung: "f u r"
+            "gilt" â†’ "g i l t"
 
-        Deshalb prüfen wir zusätzlich per _compact() (entfernt alle Leerzeichen):
-            _compact("f u r") = "fur"  → "fur" in "fur" = True ✓
+        Deshalb prÃ¼fen wir zusÃ¤tzlich per _compact() (entfernt alle Leerzeichen):
+            _compact("f u r") = "fur"  â†’ "fur" in "fur" = True âœ“
 
     Parameter:
         line_norm: Bereits normalisierte Zeile (via normalize_for_matching)
         marker:    Gesuchtes Wort, ebenfalls normalisiert (z.B. "fur", "gilt")
 
-    Rückgabe:
+    RÃ¼ckgabe:
         True wenn der Marker gefunden wurde (normal oder compact)
     """
     return (marker in line_norm) or (marker in _compact(line_norm))
@@ -115,20 +118,20 @@ def _contains_marker(line_norm: str, marker: str) -> bool:
 
 def _fmt_iso(dt: datetime | None) -> str | None:
     """
-    Formatiert ein datetime als ISO-String (YYYY-MM-DD) für die Decision Engine.
+    Formatiert ein datetime als ISO-String (YYYY-MM-DD) fÃ¼r die Decision Engine.
 
-    Beispiel: datetime(2024, 9, 15) → "2024-09-15"
-    None → None (kein Datum gefunden)
+    Beispiel: datetime(2024, 9, 15) â†’ "2024-09-15"
+    None â†’ None (kein Datum gefunden)
     """
     return dt.date().isoformat() if dt else None
 
 
 def _fmt_dot(dt: datetime | None) -> str | None:
     """
-    Formatiert ein datetime als deutsches Datum (DD.MM.YYYY) für Debug-Ausgaben.
+    Formatiert ein datetime als deutsches Datum (DD.MM.YYYY) fÃ¼r Debug-Ausgaben.
 
-    Beispiel: datetime(2024, 9, 15) → "15.09.2024"
-    None → None
+    Beispiel: datetime(2024, 9, 15) â†’ "15.09.2024"
+    None â†’ None
     """
     return dt.strftime("%d.%m.%Y") if dt else None
 
@@ -138,7 +141,7 @@ def _fmt_dot(dt: datetime | None) -> str | None:
 # =============================================================================
 #
 # Antragsdaten kommen aus dem Formular (Streamlit UI oder Excel/JSON).
-# Das Datumsformat ist NICHT garantiert — verschiedene Quellen liefern:
+# Das Datumsformat ist NICHT garantiert â€” verschiedene Quellen liefern:
 #   - ISO: "2024-09-15"
 #   - ISO mit Uhrzeit: "2024-09-15 00:00:00"
 #   - Deutsches Format: "15.09.2024"
@@ -151,19 +154,19 @@ def parse_form_datetime(value: str) -> Optional[datetime]:
     Parst ein Datumsfeld aus dem Antrag (Formular/Excel/JSON).
 
     Akzeptierte Formate:
-        "2024-09-15"              → ISO-Datum
-        "2024-09-15T00:00:00"     → ISO mit Uhrzeit
-        "2024-09-15 00:00:00"     → ISO mit Uhrzeit (Leerzeichen)
-        "15.09.2024"              → Deutsches Format (TT.MM.JJJJ)
-        ""                        → None (leer)
-        None                      → None
+        "2024-09-15"              â†’ ISO-Datum
+        "2024-09-15T00:00:00"     â†’ ISO mit Uhrzeit
+        "2024-09-15 00:00:00"     â†’ ISO mit Uhrzeit (Leerzeichen)
+        "15.09.2024"              â†’ Deutsches Format (TT.MM.JJJJ)
+        ""                        â†’ None (leer)
+        None                      â†’ None
 
-    Rückgabe:
+    RÃ¼ckgabe:
         datetime bei Erfolg, None bei leerem oder unbekanntem Format.
 
     Wichtig:
         Bei fehlenden Antragsdaten (None) bricht die Validierung nicht ab,
-        sondern gibt {all_ok: False, reason: "gilt_von/gilt_bis fehlen"} zurück.
+        sondern gibt {all_ok: False, reason: "gilt_von/gilt_bis fehlen"} zurÃ¼ck.
     """
     value = (value or "").strip()
     if not value:
@@ -175,43 +178,43 @@ def parse_form_datetime(value: str) -> Optional[datetime]:
     except ValueError:
         pass
 
-    # Versuch 2: Explizite Format-Strings für Sonderfälle
+    # Versuch 2: Explizite Format-Strings fÃ¼r SonderfÃ¤lle
     for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%d.%m.%Y"):
         try:
             return datetime.strptime(value, fmt)
         except ValueError:
             continue
 
-    # Kein Format passt → None (wird upstream als "fehlend" behandelt)
+    # Kein Format passt â†’ None (wird upstream als "fehlend" behandelt)
     return None
 
 
 # =============================================================================
-# 1b) DATUM-PARSING: ZAHLUNGSBESTÄTIGUNG (Textformat)
+# 1b) DATUM-PARSING: ZAHLUNGSBESTÃ„TIGUNG (Textformat)
 # =============================================================================
 #
-# Zahlungsbestätigungen verwenden ein anderes Datumsformat als Rechnungen:
+# ZahlungsbestÃ¤tigungen verwenden ein anderes Datumsformat als Rechnungen:
 #   "gilt 21. Dez 2024 - 20. Dez 2025"
 #
-# Das ist ein deutsches Textformat mit abgekürztem Monatsnamen.
-# Python's strptime braucht englische Monatsnamen → wir mappen erst.
+# Das ist ein deutsches Textformat mit abgekÃ¼rztem Monatsnamen.
+# Python's strptime braucht englische Monatsnamen â†’ wir mappen erst.
 
-# Regex für Textformat-Datumsangaben: "21. Dez 2024"
+# Regex fÃ¼r Textformat-Datumsangaben: "21. Dez 2024"
 # Aufbau:
-#   \d{1,2}       → Tag (1-2 Ziffern)
-#   \.             → Punkt nach dem Tag
-#   \s*            → Optionale Leerzeichen
-#   [A-Za-z...]{3} → Monatsabkürzung (3 Buchstaben, inkl. Umlaute für "Jän", "Mär")
-#   \s*            → Optionale Leerzeichen
-#   \d{4}          → Jahr (4 Ziffern)
-DATE_PATTERN_TEXT = r"\d{1,2}\.\s*[A-Za-zÄÖÜäöü]{3}\s*\d{4}"
+#   \d{1,2}       â†’ Tag (1-2 Ziffern)
+#   \.             â†’ Punkt nach dem Tag
+#   \s*            â†’ Optionale Leerzeichen
+#   [A-Za-z...]{3} â†’ MonatsabkÃ¼rzung (3 Buchstaben, inkl. Umlaute fÃ¼r "JÃ¤n", "MÃ¤r")
+#   \s*            â†’ Optionale Leerzeichen
+#   \d{4}          â†’ Jahr (4 Ziffern)
+DATE_PATTERN_TEXT = r"\d{1,2}\.\s*[A-Za-zÃ„Ã–ÃœÃ¤Ã¶Ã¼]{3}\s*\d{4}"
 
-# Mapping: Deutsche Monatsabkürzungen → Englische (für strptime)
-# Hinweis: "Mai" = "May" (zufällig gleich lang, aber unterschiedliche Schreibweise)
+# Mapping: Deutsche MonatsabkÃ¼rzungen â†’ Englische (fÃ¼r strptime)
+# Hinweis: "Mai" = "May" (zufÃ¤llig gleich lang, aber unterschiedliche Schreibweise)
 MONTH_MAP = {
-    "Jän": "Jan",    # Jänner (österreichisch für Januar)
+    "JÃ¤n": "Jan",    # JÃ¤nner (Ã¶sterreichisch fÃ¼r Januar)
     "Feb": "Feb",    # Februar
-    "Mär": "Mar",    # März
+    "MÃ¤r": "Mar",    # MÃ¤rz
     "Apr": "Apr",    # April
     "Mai": "May",    # Mai
     "Jun": "Jun",    # Juni
@@ -226,28 +229,28 @@ MONTH_MAP = {
 
 def parse_pdf_date_text(value: str | None) -> datetime | None:
     """
-    Parst Datumsangaben im Textformat aus Zahlungsbestätigungen.
+    Parst Datumsangaben im Textformat aus ZahlungsbestÃ¤tigungen.
 
     Eingabe: "21. Dez 2024"
     Ausgabe: datetime(2024, 12, 21)
 
     Ablauf:
-        1. Deutsche Monatsabkürzung → Englisch ("Dez" → "Dec")
+        1. Deutsche MonatsabkÃ¼rzung â†’ Englisch ("Dez" â†’ "Dec")
         2. strptime mit Format "%d. %b %Y"
 
-    Rückgabe:
-        datetime bei Erfolg, None bei ungültigem Format.
+    RÃ¼ckgabe:
+        datetime bei Erfolg, None bei ungÃ¼ltigem Format.
     """
     if not value:
         return None
 
     v = value.strip()
 
-    # Deutsche Monate ersetzen (z.B. "Dez" → "Dec")
+    # Deutsche Monate ersetzen (z.B. "Dez" â†’ "Dec")
     for de, en in MONTH_MAP.items():
         if de in v:
             v = v.replace(de, en)
-            break   # Nur eine Ersetzung nötig (es gibt nur einen Monat pro Datum)
+            break   # Nur eine Ersetzung nÃ¶tig (es gibt nur einen Monat pro Datum)
 
     try:
         return datetime.strptime(v, "%d. %b %Y")
@@ -260,23 +263,23 @@ def parse_pdf_date_text(value: str | None) -> datetime | None:
 # =============================================================================
 #
 # Rechnungen (Jahres- und Monatsrechnungen) verwenden das Format "DD.MM.YYYY":
-#   "Gültigkeitszeitraum: 15.09.2024 - 14.09.2025"
+#   "GÃ¼ltigkeitszeitraum: 15.09.2024 - 14.09.2025"
 #   "Leistungszeitraum:   15.09.2024 - 14.10.2024"
 #
 # OCR erzeugt aber typische Fehler:
-#   "01 .04.2023"  → Leerzeichen vor dem Punkt
-#   "31.O3.2024"   → Großbuchstabe O statt Ziffer 0
-#   "1O.12.2024"   → O mitten in einer Zahl
+#   "01 .04.2023"  â†’ Leerzeichen vor dem Punkt
+#   "31.O3.2024"   â†’ GroÃŸbuchstabe O statt Ziffer 0
+#   "1O.12.2024"   â†’ O mitten in einer Zahl
 
-# Regex für Punkt-Format-Datumsangaben (tolerant für OCR-Leerzeichen und O/0-Verwechslung)
+# Regex fÃ¼r Punkt-Format-Datumsangaben (tolerant fÃ¼r OCR-Leerzeichen und O/0-Verwechslung)
 # Aufbau:
-#   \b             → Wortgrenze (damit "12345.01.2024" nicht matcht)
-#   \d{1,2}        → Tag
-#   \s*\.\s*       → Punkt mit optionalen Leerzeichen davor/danach
-#   [\dOo]{1,2}    → Monat (1-2 Zeichen, kann O statt 0 sein)
-#   \s*\.\s*       → Punkt
-#   \d{4}          → Jahr
-#   \b             → Wortgrenze
+#   \b             â†’ Wortgrenze (damit "12345.01.2024" nicht matcht)
+#   \d{1,2}        â†’ Tag
+#   \s*\.\s*       â†’ Punkt mit optionalen Leerzeichen davor/danach
+#   [\dOo]{1,2}    â†’ Monat (1-2 Zeichen, kann O statt 0 sein)
+#   \s*\.\s*       â†’ Punkt
+#   \d{4}          â†’ Jahr
+#   \b             â†’ Wortgrenze
 DATE_PATTERN_DOT = r"\b\d{1,2}\s*\.\s*[\dOo]{1,2}\s*\.\s*\d{4}\b"
 
 
@@ -285,23 +288,23 @@ def clean_date_dot(value: str) -> str:
     Repariert typische OCR-Fehler in Punkt-Format-Datumsangaben.
 
     Reparaturen:
-        1. Alle Leerzeichen entfernen: "01 .04.2023" → "01.04.2023"
-        2. O nach Punkt → 0:           "31.O3.2024"  → "31.03.2024"
-        3. O zwischen Ziffern → 0:     "1O.12.2024"  → "10.12.2024"
+        1. Alle Leerzeichen entfernen: "01 .04.2023" â†’ "01.04.2023"
+        2. O nach Punkt â†’ 0:           "31.O3.2024"  â†’ "31.03.2024"
+        3. O zwischen Ziffern â†’ 0:     "1O.12.2024"  â†’ "10.12.2024"
 
     Parameter:
         value: Roher Datums-String aus OCR
 
-    Rückgabe:
+    RÃ¼ckgabe:
         Bereinigter String, der von strptime("%d.%m.%Y") geparst werden kann.
     """
-    # Alle Leerzeichen entfernen (OCR fügt oft welche ein: "01 .04")
+    # Alle Leerzeichen entfernen (OCR fÃ¼gt oft welche ein: "01 .04")
     v = re.sub(r"\s+", "", (value or "").strip())
 
-    # O (Buchstabe) → 0 (Ziffer) nach einem Punkt: ".O3" → ".03"
+    # O (Buchstabe) â†’ 0 (Ziffer) nach einem Punkt: ".O3" â†’ ".03"
     v = re.sub(r"(?<=\.)[Oo](?=\d)", "0", v)
 
-    # O (Buchstabe) → 0 (Ziffer) zwischen Ziffern: "1O" → "10"
+    # O (Buchstabe) â†’ 0 (Ziffer) zwischen Ziffern: "1O" â†’ "10"
     v = re.sub(r"(?<=\d)[Oo](?=\d)", "0", v)
 
     return v
@@ -312,10 +315,10 @@ def parse_pdf_date_dot(value: str | None) -> datetime | None:
     Parst Punkt-Format-Datumsangaben aus Rechnungen, mit OCR-Fehler-Korrektur.
 
     Eingabe: "01 .O4.2023"  (OCR-fehlerhaft)
-    Ablauf:  → clean_date_dot → "01.04.2023" → strptime → datetime(2023, 4, 1)
+    Ablauf:  â†’ clean_date_dot â†’ "01.04.2023" â†’ strptime â†’ datetime(2023, 4, 1)
 
-    Rückgabe:
-        datetime bei Erfolg, None bei ungültigem Format.
+    RÃ¼ckgabe:
+        datetime bei Erfolg, None bei ungÃ¼ltigem Format.
     """
     if not value:
         return None
@@ -330,48 +333,48 @@ def parse_pdf_date_dot(value: str | None) -> datetime | None:
 # 2) NAMENS-MATCHING
 # =============================================================================
 #
-# Zwei separate Matcher für Vor- und Nachnamen, weil die Logik
+# Zwei separate Matcher fÃ¼r Vor- und Nachnamen, weil die Logik
 # unterschiedlich ist:
 #
 #   VORNAME:
 #     - Es reicht, wenn der ERSTE Vorname aus dem Antrag matcht.
-#       (Antrag: "Max", PDF: "Max Michael" → OK)
+#       (Antrag: "Max", PDF: "Max Michael" â†’ OK)
 #     - Mehrfach-Vornamen im PDF werden toleriert.
 #
 #   NACHNAME:
-#     - Bei Doppelnamen müssen ALLE Teile vorkommen.
-#       (Antrag: "Muster Beispiel", PDF: "Muster Beispiel" → OK)
-#       (Antrag: "Muster Beispiel", PDF: "Beispiel" → NICHT OK)
+#     - Bei Doppelnamen mÃ¼ssen ALLE Teile vorkommen.
+#       (Antrag: "Muster Beispiel", PDF: "Muster Beispiel" â†’ OK)
+#       (Antrag: "Muster Beispiel", PDF: "Beispiel" â†’ NICHT OK)
 #
 # Beide Matcher verwenden drei Ebenen der Toleranz:
-#   1. Token-Match (exakte Wort-Übereinstimmung nach Normalisierung)
-#   2. Compact-Match (Leerzeichen entfernt, für OCR-Fehler)
-#   3. Umlaut-Varianten (ö→oe→o, ü→ue→u, etc.)
+#   1. Token-Match (exakte Wort-Ãœbereinstimmung nach Normalisierung)
+#   2. Compact-Match (Leerzeichen entfernt, fÃ¼r OCR-Fehler)
+#   3. Umlaut-Varianten (Ã¶â†’oeâ†’o, Ã¼â†’ueâ†’u, etc.)
 
 def first_name_matches_flexible(form_vorname: str, chunk_text: str) -> bool:
     """
-    Prüft, ob der Vorname aus dem Antrag im gegebenen Textausschnitt vorkommt.
+    PrÃ¼ft, ob der Vorname aus dem Antrag im gegebenen Textausschnitt vorkommt.
 
     Matching-Strategie (in Reihenfolge):
         1. Token-Match: Erster Vorname als exaktes Wort im Text?
-           "max" in ["max", "michael", "mustermann"] → True ✓
+           "max" in ["max", "michael", "mustermann"] â†’ True âœ“
 
         2. Compact-Match: OCR hat Leerzeichen verschluckt?
-           _compact("max") in _compact("maxmichael") → True ✓
+           _compact("max") in _compact("maxmichael") â†’ True âœ“
 
-        3. Umlaut-Varianten: Transliteration berücksichtigen?
-           "jurgen" ~ "juergen" ~ "jürgen" → generiert Varianten und prüft alle
+        3. Umlaut-Varianten: Transliteration berÃ¼cksichtigen?
+           "jurgen" ~ "juergen" ~ "jÃ¼rgen" â†’ generiert Varianten und prÃ¼ft alle
 
     Parameter:
         form_vorname: Vorname aus dem Antrag (z.B. "Max")
         chunk_text:   Textausschnitt aus dem PDF (z.B. "Karteninhaber: Max Michael Mustermann")
 
-    Rückgabe:
+    RÃ¼ckgabe:
         True wenn der Vorname gefunden wurde.
 
     Warum nur der ERSTE Vorname?
         Im Antrag steht typischerweise nur der Rufname ("Max"),
-        aber auf der Rechnung der vollständige Name ("Max Michael").
+        aber auf der Rechnung der vollstÃ¤ndige Name ("Max Michael").
         Wir splitten den Antrags-Vornamen und nehmen nur das erste Wort.
     """
     form_norm = normalize_for_matching(form_vorname)
@@ -379,29 +382,29 @@ def first_name_matches_flexible(form_vorname: str, chunk_text: str) -> bool:
         return False
 
     # Nur den ersten Vornamen verwenden (Rufname)
-    # "Max Michael" → "max" (nach Normalisierung)
+    # "Max Michael" â†’ "max" (nach Normalisierung)
     first = form_norm.split()[0]
 
     chunk_norm = normalize_for_matching(chunk_text)
     if not chunk_norm:
         return False
 
-    # ── Ebene 1: Token-Match (exaktes Wort) ──
+    # â”€â”€ Ebene 1: Token-Match (exaktes Wort) â”€â”€
     # "max" in {"max", "michael", "mustermann"}
     if first in chunk_norm.split():
         return True
 
-    # ── Ebene 2: Compact-Match (OCR ohne Leerzeichen) ──
+    # â”€â”€ Ebene 2: Compact-Match (OCR ohne Leerzeichen) â”€â”€
     # Wenn OCR "MaxMichael" als ein Wort erkennt:
     # _compact("max") = "max"
     # _compact("maxmichael") = "maxmichael"
-    # "max" in "maxmichael" → True
+    # "max" in "maxmichael" â†’ True
     if _compact(first) in _compact(chunk_norm):
         return True
 
-    # ── Ebene 3: Umlaut-Varianten ──
-    # "jürgen" → Varianten: ["jurgen", "juergen"]
-    # Prüfe jede Variante als Token und Compact
+    # â”€â”€ Ebene 3: Umlaut-Varianten â”€â”€
+    # "jÃ¼rgen" â†’ Varianten: ["jurgen", "juergen"]
+    # PrÃ¼fe jede Variante als Token und Compact
     for v in _variants_for_umlaut_translit(first):
         if v in chunk_norm.split() or _compact(v) in _compact(chunk_norm):
             return True
@@ -411,13 +414,13 @@ def first_name_matches_flexible(form_vorname: str, chunk_text: str) -> bool:
 
 def last_name_matches_flexible(form_nachname: str, chunk_text: str) -> bool:
     """
-    Prüft, ob der Nachname aus dem Antrag im gegebenen Textausschnitt vorkommt.
+    PrÃ¼ft, ob der Nachname aus dem Antrag im gegebenen Textausschnitt vorkommt.
 
     Matching-Strategie:
-        1. Alle Tokens aus dem Antrags-Nachnamen müssen im Text vorkommen.
-           Antrag: "Muster Beispiel" → beide Tokens müssen da sein.
+        1. Alle Tokens aus dem Antrags-Nachnamen mÃ¼ssen im Text vorkommen.
+           Antrag: "Muster Beispiel" â†’ beide Tokens mÃ¼ssen da sein.
 
-        2. Compact-Match für OCR-Fehler ("MusterBeispiel" als ein Wort).
+        2. Compact-Match fÃ¼r OCR-Fehler ("MusterBeispiel" als ein Wort).
 
         3. Umlaut-Varianten wie beim Vornamen.
 
@@ -425,12 +428,12 @@ def last_name_matches_flexible(form_nachname: str, chunk_text: str) -> bool:
         form_nachname: Nachname aus dem Antrag (z.B. "Muster-Beispiel")
         chunk_text:    Textausschnitt aus dem PDF
 
-    Rückgabe:
+    RÃ¼ckgabe:
         True wenn der Nachname gefunden wurde.
 
     Unterschied zum Vornamen:
         Beim Vornamen reicht der ERSTE Token (Rufname).
-        Beim Nachnamen müssen ALLE Tokens matchen (Doppelname = alle Teile).
+        Beim Nachnamen mÃ¼ssen ALLE Tokens matchen (Doppelname = alle Teile).
     """
     form_norm = normalize_for_matching(form_nachname)
     if not form_norm:
@@ -441,23 +444,23 @@ def last_name_matches_flexible(form_nachname: str, chunk_text: str) -> bool:
         return False
 
     # Nachname in Tokens splitten (Bindestriche werden bei Normalisierung
-    # zu Leerzeichen, daher: "Muster-Beispiel" → ["muster", "beispiel"])
+    # zu Leerzeichen, daher: "Muster-Beispiel" â†’ ["muster", "beispiel"])
     form_tokens = form_norm.split()
     chunk_tokens = set(chunk_norm.split())
 
-    # ── Ebene 1: Alle Tokens vorhanden? ──
+    # â”€â”€ Ebene 1: Alle Tokens vorhanden? â”€â”€
     # Antrag: ["muster", "beispiel"]
     # Chunk:  {"karteninhaber", "muster", "beispiel", "kund:innen", ...}
-    # all(["muster" in chunk, "beispiel" in chunk]) → True ✓
+    # all(["muster" in chunk, "beispiel" in chunk]) â†’ True âœ“
     if all(t in chunk_tokens for t in form_tokens):
         return True
 
-    # ── Ebene 2: Compact-Match (OCR-Fehler) ──
-    # "musterbeispiel" in "karteninhabermusterbeispielkund" → True
+    # â”€â”€ Ebene 2: Compact-Match (OCR-Fehler) â”€â”€
+    # "musterbeispiel" in "karteninhabermusterbeispielkund" â†’ True
     if _compact(form_norm) in _compact(chunk_norm):
         return True
 
-    # ── Ebene 3: Umlaut-Varianten ──
+    # â”€â”€ Ebene 3: Umlaut-Varianten â”€â”€
     for v in _variants_for_umlaut_translit(form_norm):
         if _compact(v) in _compact(chunk_norm):
             return True
@@ -469,20 +472,20 @@ def last_name_matches_flexible(form_nachname: str, chunk_text: str) -> bool:
 # 2b) MARKER-BASIERTES NAMENS-MATCHING
 # =============================================================================
 #
-# Das Herzstück der Namens-Validierung. Statt den ganzen PDF-Text nach
+# Das HerzstÃ¼ck der Namens-Validierung. Statt den ganzen PDF-Text nach
 # dem Namen abzusuchen (Gefahr: Firmenname matcht), suchen wir NUR
 # im Umfeld eines bestimmten Markers:
 #
-#   Rechnungen:           "Karteninhaber" → 12 Zeilen Fenster
-#   Zahlungsbestätigungen: "für"          → 4 Zeilen Fenster
+#   Rechnungen:           "Karteninhaber" â†’ 12 Zeilen Fenster
+#   ZahlungsbestÃ¤tigungen: "fÃ¼r"          â†’ 4 Zeilen Fenster
 #
 # Das Fenster (window_lines) definiert, wie viele Zeilen ab dem Marker
 # in den "Chunk" genommen werden. Der Name muss innerhalb dieses
 # Chunks vorkommen.
 #
 # Beispiel:
-#   Zeile 15: "Karteninhaber:in:"          ← Marker gefunden
-#   Zeile 16: "Erika Musterfrau"           ← Name im Chunk (15-27)
+#   Zeile 15: "Karteninhaber:in:"          â† Marker gefunden
+#   Zeile 16: "Erika Musterfrau"           â† Name im Chunk (15-27)
 #   Zeile 17: "Kund:innennr: 12345"
 #   ...
 
@@ -493,7 +496,7 @@ def name_match_near_markers(
     markers: list[tuple[list[str], int]],
 ) -> tuple[bool, str | None]:
     """
-    Prüft, ob Vor- UND Nachname im Umfeld eines Markers vorkommen.
+    PrÃ¼ft, ob Vor- UND Nachname im Umfeld eines Markers vorkommen.
 
     Parameter:
         text:           Gesamter PDF-Text
@@ -501,58 +504,58 @@ def name_match_near_markers(
         form_nachname:  Nachname aus dem Antrag (z.B. "Musterfrau")
         markers:        Liste von (marker_list, window_lines)-Tupeln.
 
-            marker_list:   Mögliche Marker-Wörter (normalisiert).
-                           Mehrere Varianten für OCR-Robustheit.
+            marker_list:   MÃ¶gliche Marker-WÃ¶rter (normalisiert).
+                           Mehrere Varianten fÃ¼r OCR-Robustheit.
             window_lines:  Wie viele Zeilen ab dem Marker in den Chunk nehmen.
 
             Beispiele:
-                [(["karteninhaber"], 12)]  → Rechnungen
-                [(["fur", "fuer"], 4)]     → Zahlungsbestätigungen
+                [(["karteninhaber"], 12)]  â†’ Rechnungen
+                [(["fur", "fuer"], 4)]     â†’ ZahlungsbestÃ¤tigungen
 
-    Rückgabe:
+    RÃ¼ckgabe:
         (match_ok, context_chunk)
 
         match_ok:      True wenn Vor- UND Nachname im Marker-Fenster gefunden
-        context_chunk: Der Textausschnitt um den ersten Marker (für Debug/UI).
+        context_chunk: Der Textausschnitt um den ersten Marker (fÃ¼r Debug/UI).
                        Auch bei Nicht-Match wird der erste gefundene Marker-
-                       Chunk zurückgegeben, damit die UI zeigen kann, was
+                       Chunk zurÃ¼ckgegeben, damit die UI zeigen kann, was
                        das Programm "gesehen" hat.
 
     Ablauf:
         1. Text in Zeilen splitten
-        2. Für jede Zeile prüfen: Enthält sie einen Marker?
-        3. Falls ja: Chunk = diese Zeile + die nächsten N Zeilen
+        2. FÃ¼r jede Zeile prÃ¼fen: EnthÃ¤lt sie einen Marker?
+        3. Falls ja: Chunk = diese Zeile + die nÃ¤chsten N Zeilen
         4. Vor- und Nachname im Chunk suchen (flexible Matcher)
-        5. Wenn beide gefunden → (True, chunk)
-        6. Kein Match bei keinem Marker → (False, erster Chunk für Debug)
+        5. Wenn beide gefunden â†’ (True, chunk)
+        6. Kein Match bei keinem Marker â†’ (False, erster Chunk fÃ¼r Debug)
     """
     lines = [l.strip() for l in text.splitlines() if l.strip()]
 
-    # Speichert den Chunk um den ERSTEN gefundenen Marker (für Debug)
+    # Speichert den Chunk um den ERSTEN gefundenen Marker (fÃ¼r Debug)
     first_context: str | None = None
 
     for i, raw in enumerate(lines):
         raw_norm = normalize_for_matching(raw)
 
-        # Prüfe jeden Marker-Typ
+        # PrÃ¼fe jeden Marker-Typ
         for marker_list, window_lines in markers:
             # Ist einer der Marker in dieser Zeile?
             if any(_contains_marker(raw_norm, m) for m in marker_list):
-                # Chunk: Zeilen i bis i+window_lines zusammenfügen
+                # Chunk: Zeilen i bis i+window_lines zusammenfÃ¼gen
                 chunk = " ".join(lines[i : i + window_lines])
 
-                # Ersten Kontext merken (für Debug, auch wenn kein Match)
+                # Ersten Kontext merken (fÃ¼r Debug, auch wenn kein Match)
                 if first_context is None:
                     first_context = chunk
 
-                # Vor- und Nachname im Chunk prüfen
+                # Vor- und Nachname im Chunk prÃ¼fen
                 fn_ok = first_name_matches_flexible(form_vorname, chunk)
                 ln_ok = last_name_matches_flexible(form_nachname, chunk)
 
                 if fn_ok and ln_ok:
                     return True, chunk
 
-    # Kein Match gefunden → False + ersten Kontext (falls Marker gefunden wurde)
+    # Kein Match gefunden â†’ False + ersten Kontext (falls Marker gefunden wurde)
     return False, first_context
 
 
@@ -560,37 +563,37 @@ def name_match_near_markers(
 # 3) ZEITRAUM-EXTRAKTION AUS PDF-TEXT
 # =============================================================================
 #
-# Drei verschiedene Funktionen für unterschiedliche Dokumenttypen und
+# Drei verschiedene Funktionen fÃ¼r unterschiedliche Dokumenttypen und
 # Zeitraum-Arten:
 #
 #   extract_period_from_zahlungsbestaetigung()
-#       → "gilt 21. Dez 2024 - 20. Dez 2025" (Textformat)
+#       â†’ "gilt 21. Dez 2024 - 20. Dez 2025" (Textformat)
 #
 #   extract_period_from_rechnung()
-#       → "Gültigkeitszeitraum: 15.09.2024 - 14.09.2025" (Punkt-Format)
-#       → Fallback: "Leistungszeitraum: ..."
+#       â†’ "GÃ¼ltigkeitszeitraum: 15.09.2024 - 14.09.2025" (Punkt-Format)
+#       â†’ Fallback: "Leistungszeitraum: ..."
 #
 #   _extract_leistungszeitraum()
-#       → Nur der Leistungszeitraum (für Monats-Prüfung)
+#       â†’ Nur der Leistungszeitraum (fÃ¼r Monats-PrÃ¼fung)
 #
-# Alle Funktionen geben ein Tupel (von_string, bis_string) zurück,
+# Alle Funktionen geben ein Tupel (von_string, bis_string) zurÃ¼ck,
 # das dann separat geparst wird.
 
 def extract_period_from_zahlungsbestaetigung(text: str) -> tuple[str | None, str | None]:
     """
-    Extrahiert den Gültigkeitszeitraum aus einer Zahlungsbestätigung.
+    Extrahiert den GÃ¼ltigkeitszeitraum aus einer ZahlungsbestÃ¤tigung.
 
     Sucht nach dem Marker "gilt" und extrahiert daraus zwei Datumsangaben
     im Textformat: "gilt 21. Dez 2024 - 20. Dez 2025"
 
     OCR-Robustheit:
         - "gilt" wird per _contains_marker() gesucht (findet auch "g i l t")
-        - Datumswerte können auf der nächsten Zeile stehen (OCR-Zeilenumbruch),
+        - Datumswerte kÃ¶nnen auf der nÃ¤chsten Zeile stehen (OCR-Zeilenumbruch),
           daher werden 3 Zeilen als Chunk zusammengefasst.
 
-    Rückgabe:
-        (von_str, bis_str) — Roh-Strings der beiden Datumsangaben
-        (None, None) — wenn kein passender Zeitraum gefunden wurde
+    RÃ¼ckgabe:
+        (von_str, bis_str) â€” Roh-Strings der beiden Datumsangaben
+        (None, None) â€” wenn kein passender Zeitraum gefunden wurde
     """
     lines = text.splitlines()
 
@@ -616,33 +619,33 @@ def extract_period_from_zahlungsbestaetigung(text: str) -> tuple[str | None, str
 
 def extract_period_from_rechnung(text: str) -> tuple[str | None, str | None]:
     """
-    Extrahiert den Gültigkeitszeitraum aus einer Jahres-/Monatsrechnung.
+    Extrahiert den GÃ¼ltigkeitszeitraum aus einer Jahres-/Monatsrechnung.
 
-    Sucht nach Markern in dieser Priorität:
-        1. "Gültigkeitszeitraum" / "Gültigkeit"  (primär)
-        2. "Leistungszeitraum"                    (Fallback für Alt-Layouts)
+    Sucht nach Markern in dieser PrioritÃ¤t:
+        1. "GÃ¼ltigkeitszeitraum" / "GÃ¼ltigkeit"  (primÃ¤r)
+        2. "Leistungszeitraum"                    (Fallback fÃ¼r Alt-Layouts)
 
     Das Ergebnis sind zwei Punkt-Format-Datumsangaben:
         "15.09.2024", "14.09.2025"
 
     OCR-Robustheit:
-        - Marker werden normalisiert (Umlaute entfernt): "gültigkeitszeitraum" → "gultigkeitszeitraum"
+        - Marker werden normalisiert (Umlaute entfernt): "gÃ¼ltigkeitszeitraum" â†’ "gultigkeitszeitraum"
         - Datumsangaben werden per clean_date_dot() repariert
-        - Chunk über 3 Zeilen (OCR-Zeilenumbrüche)
+        - Chunk Ã¼ber 3 Zeilen (OCR-ZeilenumbrÃ¼che)
         - Suche geht bis zu 80 Zeilen nach dem Marker weiter
           (bei manchen Layouts steht der Zeitraum weit unten)
 
-    Rückgabe:
-        (von_str, bis_str) — Bereinigte Datums-Strings ("DD.MM.YYYY")
-        (None, None) — wenn nichts gefunden
+    RÃ¼ckgabe:
+        (von_str, bis_str) â€” Bereinigte Datums-Strings ("DD.MM.YYYY")
+        (None, None) â€” wenn nichts gefunden
     """
     lines = text.splitlines()
 
     # Marker-Varianten (normalisiert, ohne Umlaute)
-    # "gültigkeitszeitraum" → "gultigkeitszeitraum" nach normalize_for_matching()
+    # "gÃ¼ltigkeitszeitraum" â†’ "gultigkeitszeitraum" nach normalize_for_matching()
     markers = ["gultigkeitszeitraum", "gultigkeit"]
 
-    # ── Primär: Nach "Gültigkeitszeitraum" / "Gültigkeit" suchen ──
+    # â”€â”€ PrimÃ¤r: Nach "GÃ¼ltigkeitszeitraum" / "GÃ¼ltigkeit" suchen â”€â”€
     for i, line in enumerate(lines):
         ln = normalize_for_matching(line)
 
@@ -655,7 +658,7 @@ def extract_period_from_rechnung(text: str) -> tuple[str | None, str | None]:
                 if len(matches) >= 2:
                     return clean_date_dot(matches[0]), clean_date_dot(matches[1])
 
-    # ── Fallback: "Leistungszeitraum" (Alt-Layouts) ──
+    # â”€â”€ Fallback: "Leistungszeitraum" (Alt-Layouts) â”€â”€
     for i, line in enumerate(lines):
         if normalize_for_matching(line).startswith("leistungszeitraum"):
             chunk = " ".join(lines[i:i + 3])
@@ -668,11 +671,11 @@ def extract_period_from_rechnung(text: str) -> tuple[str | None, str | None]:
 
 def _extract_leistungszeitraum(text: str) -> tuple[datetime | None, datetime | None]:
     """
-    Extrahiert NUR den Leistungszeitraum (NICHT den Gültigkeitszeitraum).
+    Extrahiert NUR den Leistungszeitraum (NICHT den GÃ¼ltigkeitszeitraum).
 
     Hintergrund:
-        Eine Rechnung hat zwei Zeiträume:
-        - Gültigkeitszeitraum: Die gesamte Laufzeit des Tickets
+        Eine Rechnung hat zwei ZeitrÃ¤ume:
+        - GÃ¼ltigkeitszeitraum: Die gesamte Laufzeit des Tickets
           (z.B. 15.09.2024 - 14.09.2025 = 12 Monate)
         - Leistungszeitraum: Der Abrechnungszeitraum dieser Rechnung
           (z.B. 15.09.2024 - 14.10.2024 = 1 Monat bei Monatsrechnung)
@@ -680,21 +683,21 @@ def _extract_leistungszeitraum(text: str) -> tuple[datetime | None, datetime | N
 
     Wird verwendet von:
         - validate_rechnung():        Dauer in Monaten berechnen (leist_months)
-        - validate_monatsrechnung():  Prüfen, ob Leistung innerhalb Gültigkeit liegt
-        - decision_engine:            Reklassifizierung (< 10 Monate → Monatsrechnung)
+        - validate_monatsrechnung():  PrÃ¼fen, ob Leistung innerhalb GÃ¼ltigkeit liegt
+        - decision_engine:            Reklassifizierung (< 10 Monate â†’ Monatsrechnung)
 
     Suche:
         Gezielt nach Zeilen, die mit "Leistungszeitraum" beginnen.
         Im Chunk (5 Zeilen) nach dem Muster "DD.MM.YYYY - DD.MM.YYYY" suchen.
 
-    Rückgabe:
-        (start_datetime, end_datetime) — Beide als datetime
-        (None, None) — wenn kein Leistungszeitraum gefunden
+    RÃ¼ckgabe:
+        (start_datetime, end_datetime) â€” Beide als datetime
+        (None, None) â€” wenn kein Leistungszeitraum gefunden
 
     Hinweis:
         Findet nur den ERSTEN Leistungszeitraum im Text. Bei Multi-Page-PDFs
         (mehrere Rechnungen in einer PDF) muss der Text VORHER seitenweise
-        gesplittet werden (decision_engine macht das über text.split('\\f')).
+        gesplittet werden (decision_engine macht das Ã¼ber text.split('\\f')).
     """
     lines = text.splitlines()
     for i, line in enumerate(lines):
@@ -707,7 +710,7 @@ def _extract_leistungszeitraum(text: str) -> tuple[datetime | None, datetime | N
             if m:
                 return parse_pdf_date_dot(m.group(1)), parse_pdf_date_dot(m.group(2))
 
-            # Zeile enthielt "Leistungszeitraum" aber kein Datum gefunden → aufhören
+            # Zeile enthielt "Leistungszeitraum" aber kein Datum gefunden â†’ aufhÃ¶ren
             break
 
     return None, None
@@ -717,17 +720,17 @@ def _months_between(start: datetime, end: datetime) -> int:
     """
     Berechnet die Anzahl Monate zwischen zwei Datumswerten.
 
-    Formel: (Jahres-Differenz × 12) + Monats-Differenz
+    Formel: (Jahres-Differenz Ã— 12) + Monats-Differenz
 
     Beispiele:
-        01.09.2024 → 01.09.2025 = 12 Monate (Jahresrechnung)
-        01.09.2024 → 01.10.2024 = 1 Monat   (Monatsrechnung)
-        01.09.2024 → 01.12.2024 = 3 Monate  (Quartalsrechnung)
+        01.09.2024 â†’ 01.09.2025 = 12 Monate (Jahresrechnung)
+        01.09.2024 â†’ 01.10.2024 = 1 Monat   (Monatsrechnung)
+        01.09.2024 â†’ 01.12.2024 = 3 Monate  (Quartalsrechnung)
 
     Verwendet in:
-        - validate_rechnung() → leist_months
-        - decision_engine → reclassify_short_jahresrechnungen()
-          (wenn leist_months < 10 → Reklassifizierung zu Monatsrechnung)
+        - validate_rechnung() â†’ leist_months
+        - decision_engine â†’ reclassify_short_jahresrechnungen()
+          (wenn leist_months < 10 â†’ Reklassifizierung zu Monatsrechnung)
     """
     return (end.year - start.year) * 12 + (end.month - start.month)
 
@@ -736,15 +739,15 @@ def _months_between(start: datetime, end: datetime) -> int:
 # 4) DEBUG: NAMEN-EXTRAKTION AUS RECHNUNG
 # =============================================================================
 #
-# Diese Funktion wird NICHT für die Validierung verwendet.
+# Diese Funktion wird NICHT fÃ¼r die Validierung verwendet.
 # Sie dient nur der Debug-Ausgabe, um zu zeigen, welchen Namen
 # das System aus der Rechnung extrahiert hat.
 #
 # Warnung: Kann Firmenname statt Personenname liefern, z.B.:
 #   "Karteninhaber:in: One Mobility Ticketing GmbH"
-#   → extrahiert "One Mobility Ticketing GmbH" ← FALSCH
+#   â†’ extrahiert "One Mobility Ticketing GmbH" â† FALSCH
 #
-# Deshalb verwenden wir für die VALIDIERUNG stattdessen
+# Deshalb verwenden wir fÃ¼r die VALIDIERUNG stattdessen
 # name_match_near_markers(), das den Antrags-Namen im Umfeld
 # des Markers sucht, statt den Namen aus dem Text zu "erraten".
 
@@ -756,31 +759,31 @@ def extract_name_from_rechnung(text: str) -> str | None:
         "Karteninhaber:in: <Name>"
         "Karteninhaber: <Name>"
 
-    Der extrahierte Name wird am ersten Störwort abgeschnitten:
-        "Musterfrau Erika Kund:innennr" → "Musterfrau Erika"
+    Der extrahierte Name wird am ersten StÃ¶rwort abgeschnitten:
+        "Musterfrau Erika Kund:innennr" â†’ "Musterfrau Erika"
 
-    Störwörter: "kund", "kunden", "kund:inn", "nr", "rechnungsdatum",
+    StÃ¶rwÃ¶rter: "kund", "kunden", "kund:inn", "nr", "rechnungsdatum",
     "fallig", "menge", "beschreibung"
 
-    Rückgabe:
+    RÃ¼ckgabe:
         Normalisierter Name oder None.
 
-    NICHT für Validierung verwenden — nur für Debug-Ausgaben.
+    NICHT fÃ¼r Validierung verwenden â€” nur fÃ¼r Debug-Ausgaben.
     """
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     full = " ".join(lines)
 
     # Regex: "Karteninhaber" (optional ":in") + ":" + Name
     m = re.search(
-        r"karteninhaber(?:\:in)?\s*:\s*([A-Za-zÄÖÜäöüß\- ]{2,})",
+        r"karteninhaber(?:\:in)?\s*:\s*([A-Za-zÃ„Ã–ÃœÃ¤Ã¶Ã¼ÃŸ\- ]{2,})",
         full,
         flags=re.IGNORECASE,
     )
     if m:
         name_raw = m.group(1).strip()
 
-        # Am ersten Störwort abschneiden (z.B. "Kund:innen", "Nr", "Rechnungsdatum")
-        # Das sind Wörter, die NACH dem Namen in der gleichen Zeile stehen können.
+        # Am ersten StÃ¶rwort abschneiden (z.B. "Kund:innen", "Nr", "Rechnungsdatum")
+        # Das sind WÃ¶rter, die NACH dem Namen in der gleichen Zeile stehen kÃ¶nnen.
         name_raw = re.split(
             r"\s+(kund|kunden|kund:inn|kundinnen|kund:innen|nr|rechnungsdatum|fallig|menge|beschreibung)\b",
             name_raw,
@@ -797,16 +800,16 @@ def extract_name_from_rechnung(text: str) -> str | None:
 # 5) VALIDIERUNGSFUNKTIONEN
 # =============================================================================
 #
-# Drei Funktionen — eine pro Dokumenttyp. Jede gibt ein dict zurück
-# mit allen Prüfergebnissen. Die Decision Engine (build_invoice_decision)
+# Drei Funktionen â€” eine pro Dokumenttyp. Jede gibt ein dict zurÃ¼ck
+# mit allen PrÃ¼fergebnissen. Die Decision Engine (build_invoice_decision)
 # ruft je nach doc_type die passende Funktion auf:
 #
-#   doc_type == "jahresrechnung"        → validate_rechnung()
-#   doc_type == "monatsrechnung"        → validate_monatsrechnung()
-#   doc_type == "zahlungsbestaetigung"  → validate_zahlungsbestaetigung()
+#   doc_type == "jahresrechnung"        â†’ validate_rechnung()
+#   doc_type == "monatsrechnung"        â†’ validate_monatsrechnung()
+#   doc_type == "zahlungsbestaetigung"  â†’ validate_zahlungsbestaetigung()
 #
 # Gemeinsames Muster aller drei Funktionen:
-#   1. Name prüfen (name_match_near_markers)
+#   1. Name prÃ¼fen (name_match_near_markers)
 #   2. Zeitraum aus PDF extrahieren
 #   3. Zeitraum aus Antrag laden
 #   4. Vergleichen
@@ -814,37 +817,37 @@ def extract_name_from_rechnung(text: str) -> str | None:
 #   6. Optional: Debug-Ausgaben (verbose=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5a) ZAHLUNGSBESTÄTIGUNG
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# 5a) ZAHLUNGSBESTÃ„TIGUNG
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def validate_zahlungsbestaetigung(form_data: dict, text: str, verbose: bool = True) -> dict:
     """
-    Validiert eine Zahlungsbestätigung gegen Antragsdaten.
+    Validiert eine ZahlungsbestÃ¤tigung gegen Antragsdaten.
 
-    Prüfungen:
-        1. NAME:    Kommt "Vorname Nachname" im Umfeld von "für" vor?
-                    Marker: "für" (normalisiert: "fur")
+    PrÃ¼fungen:
+        1. NAME:    Kommt "Vorname Nachname" im Umfeld von "fÃ¼r" vor?
+                    Marker: "fÃ¼r" (normalisiert: "fur")
                     Fenster: 4 Zeilen ab dem Marker
 
-        2. ZEITRAUM: Stimmt "gilt <von> - <bis>" mit dem Antrag überein?
+        2. ZEITRAUM: Stimmt "gilt <von> - <bis>" mit dem Antrag Ã¼berein?
                      Format: "gilt 21. Dez 2024 - 20. Dez 2025"
 
-    Rückgabe (dict):
-        name_ok:         bool       — Name gefunden?
-        name_context:    str | None — Textausschnitt um "für" (Debug)
-        period_ok:       bool       — Zeitraum stimmt überein?
-        period_pdf_raw:  dict       — Rohe Datums-Strings aus PDF
-        period_pdf_iso:  dict       — Geparste Daten als ISO-Strings
-        period_form_iso: dict       — Antrags-Daten als ISO-Strings
-        all_ok:          bool       — Gesamt: name_ok AND period_ok
-        reason:          str        — (nur bei Fehler) Grund für Ablehnung
+    RÃ¼ckgabe (dict):
+        name_ok:         bool       â€” Name gefunden?
+        name_context:    str | None â€” Textausschnitt um "fÃ¼r" (Debug)
+        period_ok:       bool       â€” Zeitraum stimmt Ã¼berein?
+        period_pdf_raw:  dict       â€” Rohe Datums-Strings aus PDF
+        period_pdf_iso:  dict       â€” Geparste Daten als ISO-Strings
+        period_form_iso: dict       â€” Antrags-Daten als ISO-Strings
+        all_ok:          bool       â€” Gesamt: name_ok AND period_ok
+        reason:          str        â€” (nur bei Fehler) Grund fÃ¼r Ablehnung
     """
 
-    # ── Name prüfen ──
-    # Marker: "für" (auf Zahlungsbestätigungen steht "für Erika Musterfrau")
-    # "für" wird zu "fur" nach normalize_for_matching (Umlaute werden entfernt)
-    # "fuer" als Alternative, falls OCR "ü" als "ue" liest
+    # â”€â”€ Name prÃ¼fen â”€â”€
+    # Marker: "fÃ¼r" (auf ZahlungsbestÃ¤tigungen steht "fÃ¼r Erika Musterfrau")
+    # "fÃ¼r" wird zu "fur" nach normalize_for_matching (Umlaute werden entfernt)
+    # "fuer" als Alternative, falls OCR "Ã¼" als "ue" liest
     name_ok, name_context = name_match_near_markers(
         text,
         form_data.get("vorname", ""),
@@ -852,18 +855,18 @@ def validate_zahlungsbestaetigung(form_data: dict, text: str, verbose: bool = Tr
         markers=[ (["fur", "fuer"], 4) ],   # 4 Zeilen Fenster (Zahlung ist kompakt)
     )
 
-    # ── Zeitraum aus PDF extrahieren ──
+    # â”€â”€ Zeitraum aus PDF extrahieren â”€â”€
     von_str, bis_str = extract_period_from_zahlungsbestaetigung(text)
-    von_pdf = parse_pdf_date_text(von_str)     # "21. Dez 2024" → datetime
+    von_pdf = parse_pdf_date_text(von_str)     # "21. Dez 2024" â†’ datetime
     bis_pdf = parse_pdf_date_text(bis_str)
 
-    # ── Zeitraum aus Antrag laden ──
+    # â”€â”€ Zeitraum aus Antrag laden â”€â”€
     von_json = parse_form_datetime(form_data.get("gilt_von", ""))
     bis_json = parse_form_datetime(form_data.get("gilt_bis", ""))
 
-    # ── Fehlende Antragsdaten? ──
-    # Wenn gilt_von oder gilt_bis im Antrag fehlen, können wir den
-    # Zeitraum nicht prüfen → all_ok = False mit Begründung
+    # â”€â”€ Fehlende Antragsdaten? â”€â”€
+    # Wenn gilt_von oder gilt_bis im Antrag fehlen, kÃ¶nnen wir den
+    # Zeitraum nicht prÃ¼fen â†’ all_ok = False mit BegrÃ¼ndung
     if von_json is None or bis_json is None:
         result = {
             "doc_type": "zahlungsbestaetigung",
@@ -877,11 +880,11 @@ def validate_zahlungsbestaetigung(form_data: dict, text: str, verbose: bool = Tr
             "reason": "gilt_von/gilt_bis fehlen im Antrag",
         }
         if verbose:
-            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag → Zeitraum-Prüfung nicht möglich")
+            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag â†’ Zeitraum-PrÃ¼fung nicht mÃ¶glich")
         return result
 
-    # ── Zeitraum vergleichen ──
-    # Beide Seiten (PDF und Antrag) müssen gesetzt sein UND exakt übereinstimmen.
+    # â”€â”€ Zeitraum vergleichen â”€â”€
+    # Beide Seiten (PDF und Antrag) mÃ¼ssen gesetzt sein UND exakt Ã¼bereinstimmen.
     # .date() wird verwendet, damit Uhrzeiten ignoriert werden.
     period_ok = (
         von_pdf is not None
@@ -890,7 +893,7 @@ def validate_zahlungsbestaetigung(form_data: dict, text: str, verbose: bool = Tr
         and bis_pdf.date() == bis_json.date()
     )
 
-    # ── Ergebnis aufbauen ──
+    # â”€â”€ Ergebnis aufbauen â”€â”€
     result = {
         "doc_type": "zahlungsbestaetigung",
         "name_ok": bool(name_ok),
@@ -902,59 +905,59 @@ def validate_zahlungsbestaetigung(form_data: dict, text: str, verbose: bool = Tr
         "all_ok": bool(name_ok and period_ok),
     }
 
-    # ── Debug-Ausgaben ──
+    # â”€â”€ Debug-Ausgaben â”€â”€
     if verbose:
         print("Name im Antrag:", form_data.get("vorname"), form_data.get("familienname"))
-        print("Name-Match Zahlungsbestätigung (near 'für'):", result["name_ok"])
+        print("Name-Match ZahlungsbestÃ¤tigung (near 'fÃ¼r'):", result["name_ok"])
         print("Zeitraum im Antrag:", von_json.date(), "-", bis_json.date())
-        print("Zeitraum auf Zahlungsbestätigung:",
+        print("Zeitraum auf ZahlungsbestÃ¤tigung:",
               von_pdf.date() if von_pdf else None, "-",
               bis_pdf.date() if bis_pdf else None)
-        print("Zeitraum-Match Zahlungsbestätigung:", result["period_ok"])
+        print("Zeitraum-Match ZahlungsbestÃ¤tigung:", result["period_ok"])
         print("DEBUG Zeitraum-Roh:", von_str, bis_str)
 
     return result
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 5b) JAHRESRECHNUNG
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
     """
     Validiert eine Jahresrechnung gegen Antragsdaten.
 
-    Prüfungen:
+    PrÃ¼fungen:
         1. NAME:              Kommt "Vorname Nachname" im Umfeld von "Karteninhaber" vor?
-        2. GÜLTIGKEITSZEITRAUM: Stimmt er mit dem Antrag überein?
+        2. GÃœLTIGKEITSZEITRAUM: Stimmt er mit dem Antrag Ã¼berein?
         3. LEISTUNGSZEITRAUM:  Wird extrahiert und Dauer in Monaten berechnet.
 
-    Besonderheit — Leistungszeitraum vs. Gültigkeitszeitraum:
-        Eine Rechnung hat ZWEI Zeiträume:
+    Besonderheit â€” Leistungszeitraum vs. GÃ¼ltigkeitszeitraum:
+        Eine Rechnung hat ZWEI ZeitrÃ¤ume:
 
-        Gültigkeitszeitraum = Laufzeit des gesamten Tickets
+        GÃ¼ltigkeitszeitraum = Laufzeit des gesamten Tickets
             z.B. 15.09.2024 - 14.09.2025 (12 Monate)
-            → Muss mit dem Antrag übereinstimmen (period_ok)
+            â†’ Muss mit dem Antrag Ã¼bereinstimmen (period_ok)
 
         Leistungszeitraum = Abrechnungszeitraum DIESER Rechnung
             z.B. 15.09.2024 - 14.09.2025 (12 Monate bei Jahresrechnung)
             z.B. 15.09.2024 - 14.10.2024 (1 Monat bei Kurzrechnung)
-            → Wird in leist_months umgerechnet
-            → Decision Engine nutzt leist_months für Reklassifizierung:
-              Wenn < 10 Monate → wird als Monatsrechnung behandelt
+            â†’ Wird in leist_months umgerechnet
+            â†’ Decision Engine nutzt leist_months fÃ¼r Reklassifizierung:
+              Wenn < 10 Monate â†’ wird als Monatsrechnung behandelt
 
-    Rückgabe (dict):
-        name_ok:          bool       — Name (Karteninhaber) matcht?
-        name_context:     str | None — Textausschnitt (Debug)
-        period_ok:        bool       — Gültigkeitszeitraum == Antrag?
-        leist_months:     int | None — Dauer des Leistungszeitraums in Monaten
-        leist_month_key:  str | None — z.B. "2024-09" (für Monatsgruppierung)
-        leist_in_guelt:   bool       — Leistungszeitraum ⊆ Gültigkeitszeitraum?
-        all_ok:           bool       — name_ok AND period_ok
-        dbg_extracted_name: str | None — Debug: extrahierter Name (kann Firma sein!)
+    RÃ¼ckgabe (dict):
+        name_ok:          bool       â€” Name (Karteninhaber) matcht?
+        name_context:     str | None â€” Textausschnitt (Debug)
+        period_ok:        bool       â€” GÃ¼ltigkeitszeitraum == Antrag?
+        leist_months:     int | None â€” Dauer des Leistungszeitraums in Monaten
+        leist_month_key:  str | None â€” z.B. "2024-09" (fÃ¼r Monatsgruppierung)
+        leist_in_guelt:   bool       â€” Leistungszeitraum âŠ† GÃ¼ltigkeitszeitraum?
+        all_ok:           bool       â€” name_ok AND period_ok
+        dbg_extracted_name: str | None â€” Debug: extrahierter Name (kann Firma sein!)
     """
 
-    # ── 1) Name prüfen ──
+    # â”€â”€ 1) Name prÃ¼fen â”€â”€
     # Marker: "Karteninhaber" (auf Rechnungen steht "Karteninhaber:in: Erika Musterfrau")
     # 12 Zeilen Fenster, weil zwischen Marker und Name manchmal
     # noch andere Felder stehen (Kund:innennr, Rechnungsnr, etc.)
@@ -965,19 +968,19 @@ def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
         markers=[ (["karteninhaber"], 12) ],
     )
 
-    # Debug-Name extrahieren (NUR für Ausgabe, NICHT für Validierung)
+    # Debug-Name extrahieren (NUR fÃ¼r Ausgabe, NICHT fÃ¼r Validierung)
     dbg_name = extract_name_from_rechnung(text)
 
-    # ── 2) Gültigkeitszeitraum aus PDF extrahieren ──
+    # â”€â”€ 2) GÃ¼ltigkeitszeitraum aus PDF extrahieren â”€â”€
     von_str, bis_str = extract_period_from_rechnung(text)
     von_pdf = parse_pdf_date_dot(von_str)
     bis_pdf = parse_pdf_date_dot(bis_str)
 
-    # ── 3) Gültigkeitszeitraum aus Antrag laden ──
+    # â”€â”€ 3) GÃ¼ltigkeitszeitraum aus Antrag laden â”€â”€
     von_json = parse_form_datetime(form_data.get("gilt_von", ""))
     bis_json = parse_form_datetime(form_data.get("gilt_bis", ""))
 
-    # ── Fehlende Antragsdaten? ──
+    # â”€â”€ Fehlende Antragsdaten? â”€â”€
     if von_json is None or bis_json is None:
         l_von, l_bis = _extract_leistungszeitraum(text)
         result = {
@@ -997,10 +1000,10 @@ def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
             "reason": "gilt_von/gilt_bis fehlen im Antrag",
         }
         if verbose:
-            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag → Zeitraum-Prüfung nicht möglich")
+            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag â†’ Zeitraum-PrÃ¼fung nicht mÃ¶glich")
         return result
 
-    # ── 4) Gültigkeitszeitraum vergleichen ──
+    # â”€â”€ 4) GÃ¼ltigkeitszeitraum vergleichen â”€â”€
     period_ok = (
         von_pdf is not None
         and bis_pdf is not None
@@ -1008,27 +1011,27 @@ def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
         and bis_pdf.date() == bis_json.date()
     )
 
-    # ── 5) Leistungszeitraum extrahieren und analysieren ──
+    # â”€â”€ 5) Leistungszeitraum extrahieren und analysieren â”€â”€
     l_von, l_bis = _extract_leistungszeitraum(text)
 
     # Dauer in Monaten berechnen
     # Beispiele:
-    #   12 Monate → echte Jahresrechnung
-    #   1 Monat  → wird von decision_engine als Monatsrechnung reklassifiziert
+    #   12 Monate â†’ echte Jahresrechnung
+    #   1 Monat  â†’ wird von decision_engine als Monatsrechnung reklassifiziert
     leist_months = _months_between(l_von, l_bis) if (l_von and l_bis) else None
 
-    # Monatsschlüssel: Jahr-Monat des Leistungsbeginns
-    # Wird für Gruppierung verwendet, wenn die Rechnung als
+    # MonatsschlÃ¼ssel: Jahr-Monat des Leistungsbeginns
+    # Wird fÃ¼r Gruppierung verwendet, wenn die Rechnung als
     # Monatsrechnung reklassifiziert wird
     leist_month_key = f"{l_von.year:04d}-{l_von.month:02d}" if l_von else None
 
-    # Prüfen, ob der Leistungszeitraum innerhalb der Ticket-Gültigkeit liegt
+    # PrÃ¼fen, ob der Leistungszeitraum innerhalb der Ticket-GÃ¼ltigkeit liegt
     leist_in_guelt = (
         l_von is not None and l_bis is not None
         and von_json.date() <= l_von.date() <= l_bis.date() <= bis_json.date()
     )
 
-    # ── 6) Ergebnis aufbauen ──
+    # â”€â”€ 6) Ergebnis aufbauen â”€â”€
     result = {
         "doc_type": "jahresrechnung",
         "name_ok": bool(name_ok),
@@ -1045,7 +1048,7 @@ def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
         "all_ok": bool(name_ok and period_ok),
     }
 
-    # ── 7) Debug-Ausgaben ──
+    # â”€â”€ 7) Debug-Ausgaben â”€â”€
     if verbose:
         print("Name im Antrag:", form_data.get("vorname"), form_data.get("familienname"))
         print("Name-Match Rechnung (near Karteninhaber):", result["name_ok"])
@@ -1061,59 +1064,59 @@ def validate_rechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
         print("Leistungszeitraum:",
               _fmt_dot(l_von), "-", _fmt_dot(l_bis),
               f"({leist_months} Monate)" if leist_months is not None else "(nicht erkannt)")
-        print("Leistungszeitraum innerhalb Gültigkeit:", result["leist_in_guelt"])
+        print("Leistungszeitraum innerhalb GÃ¼ltigkeit:", result["leist_in_guelt"])
 
     return result
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 5c) MONATSRECHNUNG
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) -> dict:
     """
     Validiert eine Monatsrechnung gegen Antragsdaten.
 
-    Eine Monatsrechnung ist eine Einzelrechnung für einen Abrechnungsmonat.
-    Drei Monatsrechnungen für VERSCHIEDENE Monate = Rechnungsnachweis OK.
+    Eine Monatsrechnung ist eine Einzelrechnung fÃ¼r einen Abrechnungsmonat.
+    Drei Monatsrechnungen fÃ¼r VERSCHIEDENE Monate = Rechnungsnachweis OK.
 
-    Prüfungen:
+    PrÃ¼fungen:
         1. NAME:    Kommt "Vorname Nachname" im Umfeld von "Karteninhaber" vor?
-        2. GÜLTIGKEIT: Stimmt der Gültigkeitszeitraum mit dem Antrag überein?
+        2. GÃœLTIGKEIT: Stimmt der GÃ¼ltigkeitszeitraum mit dem Antrag Ã¼berein?
                        (= Gesamtlaufzeit des Tickets)
-        3. LEISTUNG:   Liegt der Leistungszeitraum INNERHALB der Gültigkeit?
+        3. LEISTUNG:   Liegt der Leistungszeitraum INNERHALB der GÃ¼ltigkeit?
                        (= der eine Abrechnungsmonat dieser Rechnung)
 
     Unterschied zur Jahresrechnung:
-        - Jahresrechnung: leist_months wird berechnet, aber all_ok hängt
+        - Jahresrechnung: leist_months wird berechnet, aber all_ok hÃ¤ngt
           nur von name_ok AND period_ok ab.
         - Monatsrechnung: all_ok = name_ok AND guelt_ok AND leist_ok
-          (alle drei müssen stimmen!)
+          (alle drei mÃ¼ssen stimmen!)
 
     leist_month_key:
-        Der Monatsschlüssel (z.B. "2024-09") wird von der Decision Engine
-        verwendet, um zu zählen, wie viele VERSCHIEDENE Monate abgedeckt sind.
+        Der MonatsschlÃ¼ssel (z.B. "2024-09") wird von der Decision Engine
+        verwendet, um zu zÃ¤hlen, wie viele VERSCHIEDENE Monate abgedeckt sind.
         Beispiel: 3 Rechnungen mit keys "2024-09", "2024-10", "2024-11"
-        → 3 verschiedene Monate → monatsrechnungen_ok = True
+        â†’ 3 verschiedene Monate â†’ monatsrechnungen_ok = True
 
     Multi-Page-PDFs:
         Wenn mehrere Monatsrechnungen in EINER PDF stehen, wird der Text
         von der Decision Engine seitenweise gesplittet (text.split('\\f')).
         Diese Funktion bekommt dann nur den Text EINER Seite.
 
-    Rückgabe (dict):
-        name_ok:          bool       — Karteninhaber matcht?
-        name_context:     str | None — Textausschnitt (Debug)
-        guelt_ok:         bool       — Gültigkeitszeitraum == Antrag?
-        leist_ok:         bool       — Leistungszeitraum ⊆ Gültigkeit?
-        guelt_pdf_raw/iso: dict      — Gültigkeitsdaten (roh/ISO)
-        form_iso:         dict       — Antrags-Daten (ISO)
-        leist_pdf_iso:    dict       — Leistungszeitraum (ISO)
-        leist_month_key:  str | None — z.B. "2024-09"
-        all_ok:           bool       — Gesamt: name_ok AND guelt_ok AND leist_ok
+    RÃ¼ckgabe (dict):
+        name_ok:          bool       â€” Karteninhaber matcht?
+        name_context:     str | None â€” Textausschnitt (Debug)
+        guelt_ok:         bool       â€” GÃ¼ltigkeitszeitraum == Antrag?
+        leist_ok:         bool       â€” Leistungszeitraum âŠ† GÃ¼ltigkeit?
+        guelt_pdf_raw/iso: dict      â€” GÃ¼ltigkeitsdaten (roh/ISO)
+        form_iso:         dict       â€” Antrags-Daten (ISO)
+        leist_pdf_iso:    dict       â€” Leistungszeitraum (ISO)
+        leist_month_key:  str | None â€” z.B. "2024-09"
+        all_ok:           bool       â€” Gesamt: name_ok AND guelt_ok AND leist_ok
     """
 
-    # ── 1) Name prüfen ──
+    # â”€â”€ 1) Name prÃ¼fen â”€â”€
     # Gleicher Marker wie bei Jahresrechnung: "Karteninhaber"
     # 12 Zeilen Fenster (gleiche Rechnungslayouts)
     name_ok, name_context = name_match_near_markers(
@@ -1123,8 +1126,8 @@ def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) ->
         markers=[ (["karteninhaber"], 12) ],
     )
 
-    # ── 2) Gültigkeit (Gesamtlaufzeit des Tickets) prüfen ──
-    # Aus der Rechnung: "Gültigkeitszeitraum: 15.09.2024 - 14.09.2025"
+    # â”€â”€ 2) GÃ¼ltigkeit (Gesamtlaufzeit des Tickets) prÃ¼fen â”€â”€
+    # Aus der Rechnung: "GÃ¼ltigkeitszeitraum: 15.09.2024 - 14.09.2025"
     g_von_s, g_bis_s = extract_period_from_rechnung(text)
     g_von = parse_pdf_date_dot(g_von_s)
     g_bis = parse_pdf_date_dot(g_bis_s)
@@ -1133,7 +1136,7 @@ def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) ->
     a_von = parse_form_datetime(form_data.get("gilt_von", ""))
     a_bis = parse_form_datetime(form_data.get("gilt_bis", ""))
 
-    # ── Fehlende Antragsdaten? ──
+    # â”€â”€ Fehlende Antragsdaten? â”€â”€
     if a_von is None or a_bis is None:
         l_von, l_bis = _extract_leistungszeitraum(text)
         leist_month_key = f"{l_von.year:04d}-{l_von.month:02d}" if l_von else None
@@ -1152,50 +1155,50 @@ def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) ->
             "reason": "gilt_von/gilt_bis fehlen im Antrag",
         }
         if verbose:
-            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag → Zeitraum-Prüfung nicht möglich")
+            print("WARNUNG: gilt_von/gilt_bis fehlen im Antrag â†’ Zeitraum-PrÃ¼fung nicht mÃ¶glich")
         return result
 
-    # ── Gültigkeit vergleichen ──
-    # Beide Seiten müssen exakt übereinstimmen (Datum ohne Uhrzeit)
+    # â”€â”€ GÃ¼ltigkeit vergleichen â”€â”€
+    # Beide Seiten mÃ¼ssen exakt Ã¼bereinstimmen (Datum ohne Uhrzeit)
     guelt_ok = (
         g_von is not None and g_bis is not None
         and g_von.date() == a_von.date()
         and g_bis.date() == a_bis.date()
     )
 
-    # ── 3) Leistungszeitraum (ein einzelner Abrechnungsmonat) prüfen ──
+    # â”€â”€ 3) Leistungszeitraum (ein einzelner Abrechnungsmonat) prÃ¼fen â”€â”€
     l_von, l_bis = _extract_leistungszeitraum(text)
 
-    # Leistungszeitraum muss KOMPLETT innerhalb der Ticket-Gültigkeit liegen:
-    #   a_von ≤ l_von ≤ l_bis ≤ a_bis
+    # Leistungszeitraum muss KOMPLETT innerhalb der Ticket-GÃ¼ltigkeit liegen:
+    #   a_von â‰¤ l_von â‰¤ l_bis â‰¤ a_bis
     #
     # Beispiel (OK):
-    #   Gültigkeit:    15.09.2024 - 14.09.2025
-    #   Leistung:      15.10.2024 - 14.11.2024   → liegt komplett drin ✓
+    #   GÃ¼ltigkeit:    15.09.2024 - 14.09.2025
+    #   Leistung:      15.10.2024 - 14.11.2024   â†’ liegt komplett drin âœ“
     #
     # Beispiel (NICHT OK):
-    #   Gültigkeit:    15.09.2024 - 14.09.2025
-    #   Leistung:      15.09.2023 - 14.10.2023   → liegt VOR der Gültigkeit ✗
+    #   GÃ¼ltigkeit:    15.09.2024 - 14.09.2025
+    #   Leistung:      15.09.2023 - 14.10.2023   â†’ liegt VOR der GÃ¼ltigkeit âœ—
     leist_ok = (
         l_von is not None and l_bis is not None
         and a_von.date() <= l_von.date() <= l_bis.date() <= a_bis.date()
     )
 
-    # ── 4) Monatsschlüssel bauen ──
+    # â”€â”€ 4) MonatsschlÃ¼ssel bauen â”€â”€
     # Jahr-Monat des Leistungszeitraum-BEGINNS.
-    # Wird von der Decision Engine verwendet, um einzigartige Monate zu zählen.
+    # Wird von der Decision Engine verwendet, um einzigartige Monate zu zÃ¤hlen.
     #
     # Beispiel:
-    #   Leistung 15.09.2024 - 14.10.2024 → leist_month_key = "2024-09"
-    #   Leistung 15.10.2024 - 14.11.2024 → leist_month_key = "2024-10"
+    #   Leistung 15.09.2024 - 14.10.2024 â†’ leist_month_key = "2024-09"
+    #   Leistung 15.10.2024 - 14.11.2024 â†’ leist_month_key = "2024-10"
     #
     # In der Decision Engine:
-    #   valid_months = {"2024-09", "2024-10", "2024-11"}  → 3 verschiedene → OK
+    #   valid_months = {"2024-09", "2024-10", "2024-11"}  â†’ 3 verschiedene â†’ OK
     leist_month_key = None
     if l_von is not None:
         leist_month_key = f"{l_von.year:04d}-{l_von.month:02d}"
 
-    # ── 5) Ergebnis aufbauen ──
+    # â”€â”€ 5) Ergebnis aufbauen â”€â”€
     result = {
         "doc_type": "monatsrechnung",
         "name_ok": bool(name_ok),
@@ -1207,18 +1210,18 @@ def validate_monatsrechnung(form_data: dict, text: str, verbose: bool = True) ->
         "form_iso": {"von": a_von.date().isoformat(), "bis": a_bis.date().isoformat()},
         "leist_pdf_iso": {"von": _fmt_iso(l_von), "bis": _fmt_iso(l_bis)},
         "leist_month_key": leist_month_key,
-        # Gesamt: ALLE drei Checks müssen bestehen
+        # Gesamt: ALLE drei Checks mÃ¼ssen bestehen
         # (Unterschied zur Jahresrechnung, wo leist_months nur informativ ist)
         "all_ok": bool(name_ok and guelt_ok and leist_ok),
     }
 
-    # ── 6) Debug-Ausgaben ──
+    # â”€â”€ 6) Debug-Ausgaben â”€â”€
     if verbose:
         print("Name-Match Monatsrechnung (near Karteninhaber):", result["name_ok"])
-        print("Gültigkeit Monatsrechnung:",
+        print("GÃ¼ltigkeit Monatsrechnung:",
               _fmt_dot(g_von), "-", _fmt_dot(g_bis), "->", result["guelt_ok"])
         print("Leistungszeitraum Monatsrechnung:",
               _fmt_dot(l_von), "-", _fmt_dot(l_bis), "->", result["leist_ok"])
-        print("Leistungs-Monatsschlüssel:", leist_month_key)
+        print("Leistungs-MonatsschlÃ¼ssel:", leist_month_key)
 
     return result
