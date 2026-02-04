@@ -1,0 +1,68 @@
+# =============================================================================
+# requirements.txt — Python-Abhängigkeiten (pip)
+# =============================================================================
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Diese Datei wird von Streamlit Cloud automatisch gelesen und per
+# pip installiert.
+#
+# Systemabhängigkeiten (Tesseract, Poppler) stehen in: packages.txt
+# =============================================================================
+
+
+# ── PDF-Verarbeitung ──
+
+# pypdf: Liest den eingebetteten Textlayer aus PDFs (ohne OCR).
+# Verwendet in: document_loader.py (PdfReader)
+pypdf>=4.0
+
+# pdf2image: Konvertiert PDF-Seiten in Bilder (für OCR-Fallback).
+# Benötigt Poppler (pdftoppm) als Systemabhängigkeit → siehe packages.txt
+# Verwendet in: document_loader.py (convert_from_path)
+pdf2image>=1.16
+
+# pytesseract: Python-Wrapper für die Tesseract-OCR-Engine.
+# Benötigt Tesseract als Systemabhängigkeit → siehe packages.txt
+# Verwendet in: document_loader.py (image_to_string)
+pytesseract>=0.3.10
+
+# Pillow: Bildverarbeitung, wird von pdf2image und pytesseract intern genutzt.
+Pillow>=10.0
+
+
+# ── Machine Learning (Dokumentklassifizierung) ──
+
+# scikit-learn: ML-Framework für den trainierten Dokumentklassifizierer.
+# Die .joblib-Modelle (TF-IDF Vectorizer + Classifier) wurden mit
+# scikit-learn trainiert und müssen mit einer kompatiblen Version
+# geladen werden.
+# Verwendet in: document_classifier.py (indirekt via joblib)
+scikit-learn>=1.3
+
+# joblib: Serialisierung der ML-Modelle (.joblib-Dateien).
+# Wird von scikit-learn mitinstalliert, hier explizit für Klarheit.
+# Verwendet in: document_classifier.py (joblib.load)
+joblib>=1.3
+
+
+# ── Datenverarbeitung & Export ──
+
+# pandas: DataFrame-Erstellung und Excel-Export des Batch-Reports.
+# Verwendet in: main.py (pd.DataFrame, df.to_excel)
+pandas>=2.0
+
+# openpyxl: Excel-Schreiber, wird von pandas für .xlsx-Dateien benötigt.
+# Ohne openpyxl wirft df.to_excel() einen Fehler.
+# Verwendet in: main.py (indirekt via pandas)
+openpyxl>=3.1
+
+
+# ── Web-Interface (optional, nur für app.py) ──
+
+# streamlit: Web-UI für die interaktive Einzelfallprüfung.
+# Nur nötig, wenn app.py genutzt wird (nicht für Batch-Verarbeitung).
+# Auf Streamlit Cloud ist das automatisch verfügbar.
+# Verwendet in: app.py
+streamlit>=1.30

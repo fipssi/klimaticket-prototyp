@@ -8,12 +8,15 @@ import streamlit as st
 # Module aus deinem Projekt
 from src.document_classifier import classify_document
 from src.document_loader import extract_text_from_pdf
-from src.decision_engine import build_overall_decision
+from src.decision_engine import (
+    build_overall_decision,
+    reclassify_short_jahresrechnungen,   # NEU: für kurze Jahresrechnungen
+)
 from src.registration_validation import is_postcode_foerderberechtigt
 
 # Session-State initialisieren:
 # - decision: speichert das Ergebnis der Decision Engine
-# - classified_pdfs: speichert (Pfad, Dokumenttyp)-Paare für Hinweise
+# - classified_pdfs: speichert (Pfad, Dokumenttyp, Text, Konfidenz)-Tupel
 if "decision" not in st.session_state:
     st.session_state["decision"] = None
 if "classified_pdfs" not in st.session_state:
@@ -32,10 +35,10 @@ st.header("Antragsdaten")
 vorname = st.text_input("Vorname")
 nachname = st.text_input("Nachname")
 plz = st.text_input("PLZ")
-geburtsdatum = st.text_input("Geburtsdatum (YYYY-MM-DD)")
+geburtsdatum = st.text_input("Geburtsdatum (TT.MM.JJJJ)", placeholder="z.B. 01.01.1990")
 ticket_typ = st.text_input("Ticket-Typ (z.B. Classic)")
-gilt_von = st.text_input("Gültig von (YYYY-MM-DD)")
-gilt_bis = st.text_input("Gültig bis (YYYY-MM-DD)")
+gilt_von = st.text_input("Gültig von (TT.MM.JJJJ)", placeholder="z.B. 01.01.2025")
+gilt_bis = st.text_input("Gültig bis (TT.MM.JJJJ)", placeholder="z.B. 31.12.2025")
 
 # ---------------------------------------------------------
 # Abschnitt: Datei-Upload (mehrere PDFs in einem Feld)
@@ -56,89 +59,80 @@ if plz and not is_postcode_foerderberechtigt(plz):
     )
 
 # ---------------------------------------------------------
-# Button löst „Prüfen“-Logik aus
+# Button löst „Prüfen"-Logik aus
 # ---------------------------------------------------------
-# Wenn der Benutzer auf den Button klickt, startet die gesamte Prüf-Logik
 if st.button("Prüfen"):
-    # Spinner zeigt im UI: „Dokumente werden geprüft ...“ solange der Block läuft
     with st.spinner("Dokumente werden geprüft ..."):
         # 1) Formulardaten aus den Eingabefeldern in ein dict packen
         form_data = {
-            "antrags_id": "TEST-UI",   # Platzhalter-ID für den Demo-Antrag
-            "intern_id": "UI-0001",    # interne Referenz, hier nur Demo
-            "familienname": nachname,  # Nachname aus Textfeld
-            "vorname": vorname,        # Vorname aus Textfeld
-            "strasse": "",             # aktuell noch nicht im UI abgefragt
-            "plz": plz,                # PLZ aus Textfeld
-            "geburtsdatum": geburtsdatum,  # Geburtsdatum im ISO-Format
-            "ticket_typ": ticket_typ,      # z.B. „Classic“ aus Textfeld
-            "gilt_von": gilt_von,          # Beginn des Ticket-Zeitraums
-            "gilt_bis": gilt_bis,          # Ende des Ticket-Zeitraums
+            "antrags_id": "TEST-UI",
+            "intern_id": "UI-0001",
+            "familienname": nachname,
+            "vorname": vorname,
+            "strasse": "",
+            "plz": plz,
+            "geburtsdatum": geburtsdatum,
+            "ticket_typ": ticket_typ,
+            "gilt_von": gilt_von,
+            "gilt_bis": gilt_bis,
         }
 
-        # Die gesammelten Formulardaten zur Kontrolle im UI anzeigen
         st.subheader("Formulardaten (form_data)")
         st.json(form_data)
 
-        # 2) Hochgeladene Dateien anzeigen und sicherstellen, dass überhaupt welche da sind
+        # 2) Hochgeladene Dateien prüfen
         st.subheader("Hochgeladene Dateien")
         st.write("Anzahl:", len(uploaded_files))
 
-        # Wenn keine Dateien hochgeladen wurden, Hinweis anzeigen und Verarbeitung abbrechen
         if not uploaded_files:
             st.warning(
                 "Es wurden keine Dokumente hochgeladen. "
                 "Bitte Meldebestätigung und Klimaticket-Rechnung(en) als PDF hochladen."
             )
-            # bricht nur den Button-Handler ab, nicht die ganze App
             st.stop()
 
-        # 3) Temporäres Verzeichnis anlegen, in dem alle Uploads für diese Sitzung gespeichert werden
+        # 3) Temporäres Verzeichnis anlegen
         temp_dir = tempfile.mkdtemp()
         st.write("TEMP-Verzeichnis:", temp_dir)
 
-        # Liste, in der die Pfade zu allen gespeicherten PDFs gesammelt werden
         paths: list[Path] = []
 
-        # Jede hochgeladene Datei aus dem Streamlit-Upload-Objekt auf die Festplatte schreiben
         for f in uploaded_files:
             save_path = Path(temp_dir) / f.name
-
-            # Binären Inhalt des Uploads in die Datei schreiben
             with open(save_path, "wb") as out:
                 out.write(f.read())
-
             st.write("- gespeichert als:", str(save_path))
             paths.append(save_path)
 
-        # 4) Alle gespeicherten PDFs einlesen und klassifizieren
-        classified_pdfs: list[tuple[Path, str]] = []
-        for pdf_path in paths:
-            # Text aus dem PDF holen (inkl. OCR, falls nötig)
-            text = extract_text_from_pdf(pdf_path)
-            # Dokumenttyp (meldezettel, jahresrechnung, ...) per ML-Modell bestimmen
-            doc_type = classify_document(text)
-            # Pfad + erkannter Typ speichern
-            classified_pdfs.append((pdf_path, doc_type))
-            st.write(f"Dokument {pdf_path.name} klassifiziert als: {doc_type}")
+        # 4) PDFs einlesen und klassifizieren
+        #    FIX: classify_document() gibt (doc_type, confidence) zurück
+        #    FIX: classified_pdfs muss 4-Tupel sein: (Pfad, Typ, Text, Konfidenz)
+        classified_pdfs: list[tuple[Path, str, str, float]] = []
 
-        # 5) Decision Engine aufrufen, die aus form_data + klassifizierten PDFs
-        #    die Gesamtförderentscheidung berechnet
+        for pdf_path in paths:
+            text = extract_text_from_pdf(pdf_path)
+            doc_type, confidence = classify_document(text)      # Tupel entpacken!
+            classified_pdfs.append((pdf_path, doc_type, text, confidence))
+            st.write(
+                f"Dokument **{pdf_path.name}** klassifiziert als: "
+                f"**{doc_type}** (Konfidenz: {confidence:.0%})"
+            )
+
+        # 5) Reklassifizierung: kurze Jahresrechnungen → Monatsrechnung
+        classified_pdfs = reclassify_short_jahresrechnungen(classified_pdfs)
+
+        # 6) Decision Engine aufrufen
         overall_decision = build_overall_decision(form_data, classified_pdfs)
 
-        # 6) Ergebnis im Session-State ablegen, damit es auch nach einem Re-Render
-        #    noch zur Verfügung steht
+        # 7) Ergebnis im Session-State ablegen
         st.session_state["decision"] = overall_decision
         st.session_state["classified_pdfs"] = classified_pdfs
 
-    # Dieser Code läuft NACH dem Spinner-Block, wenn alles fertig verarbeitet ist
     st.success("Prüfung abgeschlossen.")
 
 
 # ---------------------------------------------------------
-# Ergebnis-Anzeige + „Antrag absenden“-Button
-# wird immer ausgeführt, aber nur angezeigt,
-# wenn bereits eine Entscheidung im Session-State liegt
+# Ergebnis-Anzeige + „Antrag absenden"-Button
 # ---------------------------------------------------------
 decision = st.session_state["decision"]
 classified_pdfs = st.session_state["classified_pdfs"]
@@ -148,62 +142,176 @@ if decision is not None:
     rechnungen_ok = decision["rechnungen_ok"]
     all_ok = decision["all_ok"]
 
+    melde_decision = decision["melde_decision"]
     invoice_decision = decision["invoice_decision"]
-    monats_valid = invoice_decision.get("monatsrechnungen_valid", 0)
 
+    # ── Gesamtergebnis ──
     st.subheader("Ergebnis")
-    st.write(f"Meldezettel: {'OK' if melde_ok else 'NICHT OK'}")
-    st.write(f"Rechnungen: {'OK' if rechnungen_ok else 'NICHT OK'}")
-    st.write(f"Gesamtentscheidung: {'OK' if all_ok else 'NICHT OK'}")
+    if all_ok:
+        st.success("✅ Alle Prüfungen bestanden — Antrag kann abgesendet werden.")
+    else:
+        st.error("❌ Antrag kann noch nicht abgesendet werden.")
 
-    # Prüfen, ob überhaupt passende Dokumenttypen erkannt wurden
-    has_melde = any(doc_type == "meldezettel" for _, doc_type in classified_pdfs)
+    # ── Meldezettel-Status ──
+    st.markdown("---")
+    st.markdown("#### Meldezettel")
+
+    if not melde_decision.get("meldezettel_found"):
+        # ── Kein Meldezettel erkannt ──
+        st.warning(
+            "📄 **Kein Meldezettel erkannt.** "
+            "Bitte eine gültige Meldebestätigung (Bestätigung der Meldung "
+            "aus dem Zentralen Melderegister) als PDF hochladen."
+        )
+    elif melde_ok:
+        # ── Alles OK ──
+        st.success(
+            f"✅ Meldezettel OK "
+            f"({melde_decision.get('meldezettel_file', '')})"
+        )
+    else:
+        # ── Meldezettel vorhanden aber Fehler ──
+        details = melde_decision.get("details", {})
+        checks = details.get("checks", {})
+        extracted = details.get("extracted", {})
+
+        fehler = []
+
+        if not checks.get("vorname_ok"):
+            m_vn = extracted.get("vorname_full") or "—"
+            fehler.append(
+                f"**Vorname** stimmt nicht überein "
+                f"(Antrag: *{vorname}*, Meldezettel: *{m_vn}*)"
+            )
+
+        if not checks.get("nachname_ok"):
+            m_nn = extracted.get("nachname") or "—"
+            fehler.append(
+                f"**Nachname** stimmt nicht überein "
+                f"(Antrag: *{nachname}*, Meldezettel: *{m_nn}*)"
+            )
+
+        if not checks.get("geburtsdatum_ok"):
+            m_gd = extracted.get("geburtsdatum_iso") or "—"
+            fehler.append(
+                f"**Geburtsdatum** stimmt nicht überein "
+                f"(Antrag: *{geburtsdatum}*, Meldezettel: *{m_gd}*)"
+            )
+
+        if not checks.get("plz_ok"):
+            m_plz = extracted.get("plz") or "—"
+            if not checks.get("plz_ok_melde"):
+                fehler.append(
+                    f"**PLZ {m_plz}** aus dem Meldezettel ist nicht förderberechtigt. "
+                    f"Nur Hauptwohnsitz in der Stadt Salzburg berechtigt zur Förderung."
+                )
+            elif not checks.get("plz_ok_form"):
+                fehler.append(
+                    f"**PLZ im Antrag** ({plz}) stimmt nicht mit dem "
+                    f"Meldezettel überein (PLZ: {m_plz})."
+                )
+
+        # Fehlermeldungen anzeigen
+        file_hint = melde_decision.get("meldezettel_file", "")
+        st.error(f"❌ Meldezettel nicht gültig ({file_hint}):")
+        for f in fehler:
+            st.markdown(f"- {f}")
+
+    # ── Rechnungs-Status ──
+    st.markdown("---")
+    st.markdown("#### Rechnungsnachweis")
+
     has_invoice_like = any(
         doc_type in ("jahresrechnung", "monatsrechnung", "zahlungsbestaetigung")
-        for _, doc_type in classified_pdfs
+        for _, doc_type, _, _ in classified_pdfs
     )
 
-    if not has_melde:
-        st.warning(
-            "Es wurde kein Meldezettel erkannt. "
-            "Bitte eine gültige Meldebestätigung hochladen."
-        )
-
     if not has_invoice_like:
+        # ── Gar keine Rechnungsdokumente erkannt ──
         st.warning(
-            "Es wurde keine Klimaticket-Rechnung, Monatsrechnung "
-            "oder Zahlungsbestätigung erkannt. "
-            "Bitte ein entsprechendes Dokument hochladen."
+            "📄 **Kein Rechnungsdokument erkannt.** "
+            "Bitte eine KlimaTicket-Jahresrechnung, Monatsrechnungen "
+            "oder eine Zahlungsbestätigung als PDF hochladen."
         )
-
-    # Inhaltlich ungültiger Meldezettel
-    if has_melde and not melde_ok:
-        st.error(
-            "Der hochgeladene Meldezettel ist für diesen Antrag nicht gültig. "
-            "Bitte Name, Geburtsdatum und förderberechtigte Adresse (PLZ) prüfen."
-        )
-
-    # Inhaltlich ungültige Rechnungen
-    if has_invoice_like and not rechnungen_ok:
-        if 0 < monats_valid < 3:
-            st.error(
-                f"Es wurden nur {monats_valid} gültige Monatsrechnungen erkannt. "
-                "Für die Förderung müssen mindestens 3 unterschiedliche Monatsrechnungen innerhalb des Gültigkeitszeitraum des KlimaTicket hochgeladen werden."
+    elif rechnungen_ok:
+        # ── Rechnungsnachweis OK — zeige welcher Weg erfolgreich war ──
+        if invoice_decision.get("jahresrechnung_ok"):
+            j_det = invoice_decision.get("jahresrechnung_details", {})
+            j_file = j_det.get("_source_file", "")
+            j_months = j_det.get("leist_months", "?")
+            st.success(
+                f"✅ Jahresrechnung OK ({j_file}, {j_months} Monate Leistungszeitraum)"
             )
-        else:
-            st.error(
-                "Die hochgeladenen Rechnungsdokumente erfüllen die Förderkriterien noch nicht. "
-                "Bitte Zeitraum, Ticket-Typ und Karteninhaber:in prüfen."
-            )
+        elif invoice_decision.get("zahlungsbestaetigung_ok"):
+            z_det = invoice_decision.get("zahlungsbestaetigung_details", {})
+            z_file = z_det.get("_source_file", "")
+            st.success(f"✅ Zahlungsbestätigung OK ({z_file})")
+        elif invoice_decision.get("monatsrechnungen_ok"):
+            m_valid = invoice_decision.get("monatsrechnungen_valid", 0)
+            st.success(f"✅ Monatsrechnungen OK ({m_valid} gültige Monate)")
+    else:
+        # ── Rechnungsdokumente vorhanden, aber nicht ausreichend ──
 
-    # Nur wenn ALLES OK ist, darf der Antrag abgesendet werden
+        # Jahresrechnung-Fehler
+        if invoice_decision.get("jahresrechnung_found"):
+            j_det = invoice_decision.get("jahresrechnung_details", {})
+            j_file = j_det.get("_source_file", "")
+            j_fehler = []
+
+            if not j_det.get("name_ok"):
+                j_fehler.append("Name (Karteninhaber:in) stimmt nicht mit dem Antrag überein")
+            if not j_det.get("period_ok"):
+                j_fehler.append("Gültigkeitszeitraum stimmt nicht mit dem Antrag überein")
+
+            if j_fehler:
+                st.error(f"❌ Jahresrechnung ({j_file}):")
+                for f in j_fehler:
+                    st.markdown(f"- {f}")
+
+        # Zahlungsbestätigung-Fehler
+        if invoice_decision.get("zahlungsbestaetigung_found"):
+            z_det = invoice_decision.get("zahlungsbestaetigung_details", {})
+            z_file = z_det.get("_source_file", "")
+            z_fehler = []
+
+            if not z_det.get("name_ok"):
+                z_fehler.append("Name stimmt nicht mit dem Antrag überein")
+            if not z_det.get("period_ok"):
+                z_fehler.append("Zeitraum stimmt nicht mit dem Antrag überein")
+
+            if z_fehler:
+                st.error(f"❌ Zahlungsbestätigung ({z_file}):")
+                for f in z_fehler:
+                    st.markdown(f"- {f}")
+
+        # Monatsrechnungen-Status
+        monats_found = invoice_decision.get("monatsrechnungen_found", 0)
+        monats_valid = invoice_decision.get("monatsrechnungen_valid", 0)
+
+        if monats_found > 0:
+            if monats_valid == 0:
+                st.error(
+                    f"❌ {monats_found} Monatsrechnung(en) erkannt, "
+                    f"aber keine davon ist gültig. "
+                    f"Bitte Karteninhaber:in und Gültigkeitszeitraum prüfen."
+                )
+            elif monats_valid < 3:
+                st.warning(
+                    f"⚠️ {monats_valid} von mindestens 3 benötigten "
+                    f"Monatsrechnungen gültig. "
+                    f"Bitte weitere Monatsrechnungen für unterschiedliche "
+                    f"Monate hochladen."
+                )
+
+    # ── Antrag absenden ──
+    st.markdown("---")
     if all_ok:
         st.subheader("Antrag abschließen")
         send_clicked = st.button("Antrag absenden")
         if send_clicked:
-            st.success("Antrag wurde (im Prototyp) erfolgreich abgesendet.")
+            st.success("🎉 Antrag wurde (im Prototyp) erfolgreich abgesendet.")
     else:
         st.info(
             "Antrag kann derzeit nicht abgesendet werden. "
-            "Bitte Hinweise oben beachten und Dokumente/Angaben korrigieren."
+            "Bitte die Hinweise oben beachten."
         )

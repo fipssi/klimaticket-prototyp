@@ -1,3 +1,16 @@
+# =============================================================================
+# packages.txt — Systemabhängigkeiten (apt-get)
+# =============================================================================
+#
+# Diese Datei wird von Streamlit Cloud automatisch gelesen und per
+# apt-get installiert. Sie enthält KEINE Python-Pakete!
+#
+# Python-Pakete stehen in: requirements.txt
+#
+# Lokal (Linux) kann man diese Pakete manuell installieren:
+#   sudo apt install -y tesseract-ocr tesseract-ocr-deu poppler-utils
+# =============================================================================
+
 tesseract-ocr
 tesseract-ocr-deu
 poppler-utils

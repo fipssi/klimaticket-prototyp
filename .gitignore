@@ -41,6 +41,7 @@ tmp/
 *.png
 *.jpg
 *.jpeg
+case_report.xlsx
 
 # Build / packaging
 build/

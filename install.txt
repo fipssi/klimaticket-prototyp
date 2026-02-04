@@ -1,1 +1,246 @@
-pypdf
+# =============================================================================
+# install.txt — Installationsanleitung KlimaTicket-Förderantragsprüfung
+# =============================================================================
+#
+# Diese Anleitung beschreibt die vollständige Einrichtung des Projekts
+# auf Windows, Linux und in Streamlit Cloud.
+#
+# =============================================================================
+
+
+================================================================================
+VORAUSSETZUNGEN
+================================================================================
+
+    Python:     3.10 oder höher (wegen type hints: list[str], dict | None)
+    Git:        Für das Klonen des Repositories
+    Tesseract:  OCR-Engine (Pflicht)
+    Poppler:    PDF-Rendering (Pflicht)
+
+
+================================================================================
+SCHRITT 1: REPOSITORY KLONEN
+================================================================================
+
+    git clone https://github.com/<dein-username>/klimaticket-foerderung.git
+    cd klimaticket-foerderung
+
+
+================================================================================
+SCHRITT 2: SYSTEMABHÄNGIGKEITEN INSTALLIEREN
+================================================================================
+
+Das Projekt benötigt zwei externe Programme, die NICHT über pip installierbar
+sind: Tesseract (OCR) und Poppler (PDF-Rendering).
+
+
+── WINDOWS ─────────────────────────────────────────────────────────────────
+
+    1) Tesseract OCR installieren:
+       • Download: https://github.com/UB-Mannheim/tesseract/wiki
+       • Installer ausführen (z.B. tesseract-ocr-w64-setup-5.x.x.exe)
+       • WICHTIG: Im Installer "Additional language data" → "German" auswählen
+       • Standard-Installationspfad: C:\Program Files\Tesseract-OCR\
+       • Dieser Pfad ist in document_loader.py bereits konfiguriert:
+           pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+    2) Poppler installieren:
+       • Download: https://github.com/oschwartz10612/poppler-windows/releases
+       • ZIP entpacken (z.B. nach C:\poppler-25.12.0\)
+       • Der bin/-Ordner muss pdftoppm.exe enthalten
+       • Dieser Pfad ist in document_loader.py bereits konfiguriert:
+           POPPLER_PATH = r"C:\poppler-25.12.0\Library\bin"
+
+    3) Pfade anpassen (falls nötig):
+       Wenn Tesseract oder Poppler an einem anderen Ort installiert sind,
+       die Pfade in document_loader.py (Zeilen ~88-93) anpassen.
+
+
+── LINUX (Ubuntu/Debian) ───────────────────────────────────────────────────
+
+    sudo apt update
+    sudo apt install -y tesseract-ocr tesseract-ocr-deu poppler-utils
+
+    Das war's. Auf Linux werden Tesseract und Poppler über den System-PATH
+    gefunden. In document_loader.py ist POPPLER_PATH = None gesetzt,
+    damit pdf2image automatisch /usr/bin/pdftoppm findet.
+
+
+── macOS ───────────────────────────────────────────────────────────────────
+
+    brew install tesseract tesseract-lang poppler
+
+
+── Streamlit Cloud ─────────────────────────────────────────────────────────
+
+    Beide Dateien liegen bereits im Projektroot:
+
+        packages.txt      → Systemabhängigkeiten (apt-get)
+                             Enthält: tesseract-ocr, tesseract-ocr-deu, poppler-utils
+
+        requirements.txt  → Python-Abhängigkeiten (pip)
+                             Enthält: pypdf, pdf2image, pytesseract, pandas, ...
+
+    Streamlit Cloud erkennt beide Dateien automatisch.
+
+    ACHTUNG: Die Benennung ist FEST vorgegeben:
+        packages.txt     = apt-get (NICHT für Python-Pakete!)
+        requirements.txt = pip     (NICHT für Systemtools!)
+
+
+================================================================================
+SCHRITT 3: PYTHON-UMGEBUNG EINRICHTEN
+================================================================================
+
+    Empfohlen: Virtuelle Umgebung verwenden.
+
+    # Virtuelle Umgebung erstellen
+    python -m venv .venv
+
+    # Aktivieren
+    # Windows:
+    .venv\Scripts\activate
+    # Linux/macOS:
+    source .venv/bin/activate
+
+    # Python-Pakete installieren
+    pip install -r requirements.txt
+
+
+================================================================================
+SCHRITT 4: ML-MODELLE BEREITSTELLEN
+================================================================================
+
+    Die Dokumentklassifizierung benötigt zwei trainierte Modell-Dateien:
+
+        models/document_vectorizer.joblib    (TF-IDF Vectorizer)
+        models/document_classifier.joblib    (Classifier: SVM/RandomForest/etc.)
+
+    Diese Dateien sind NICHT im Repository enthalten (zu groß für Git).
+
+    Option A: Modelle manuell kopieren
+        Kopiere die .joblib-Dateien in den models/-Ordner.
+
+    Option B: Modelle neu trainieren
+        Falls du die Trainingsdaten hast, kannst du die Modelle
+        neu trainieren (separates Trainings-Skript erforderlich).
+
+    Ohne diese Dateien stürzt der Import von document_classifier.py ab!
+
+
+================================================================================
+SCHRITT 5: DATEN-ORDNERSTRUKTUR ANLEGEN
+================================================================================
+
+    Für die Batch-Verarbeitung (main.py) muss diese Struktur existieren:
+
+        data/
+        └── cases/
+            ├── 2024-09/              ← Monats-Ordner (Format: YYYY-MM)
+            │   ├── 12345/            ← Case-Ordner (case_id)
+            │   │   ├── antrag.json   ← Antragsdaten (Pflicht!)
+            │   │   ├── 11612.pdf     ← PDF-Dokumente (beliebig viele)
+            │   │   ├── 11413.pdf
+            │   │   └── 11987.pdf
+            │   └── 12346/
+            │       └── ...
+            └── 2024-10/
+                └── ...
+
+    antrag.json muss mindestens diese Felder enthalten:
+
+        {
+            "vorname":       "Max",
+            "familienname":  "Mustermann",
+            "geburtsdatum":  "01.01.1990",
+            "plz":           "5020",
+            "gilt_von":      "2024-09-15",
+            "gilt_bis":      "2025-09-14"
+        }
+
+
+================================================================================
+SCHRITT 6: PROGRAMM STARTEN
+================================================================================
+
+    ── Option A: Batch-Verarbeitung (alle Cases auf einmal) ──
+
+        cd src
+        python main.py
+
+        Ausgabe: case_report.xlsx im Projektverzeichnis
+
+
+    ── Option B: Streamlit Web-Interface (Einzelfallprüfung) ──
+
+        # Vom Projektverzeichnis aus:
+        streamlit run app.py
+
+        Öffnet automatisch http://localhost:8501 im Browser.
+
+
+    ── Option C: Einzelne PDF testen (Klassifizierung) ──
+
+        cd src
+        python try_classifier.py
+
+        (Pfad zur PDF muss im Skript angepasst werden)
+
+
+================================================================================
+FEHLERBEHEBUNG
+================================================================================
+
+    Problem: "TesseractNotFoundError"
+    → Tesseract ist nicht installiert oder der Pfad stimmt nicht.
+    → Windows: Pfad in document_loader.py prüfen (Zeile ~93)
+    → Linux: sudo apt install tesseract-ocr
+
+    Problem: "PDFInfoNotInstalledError" / "pdftoppm not found"
+    → Poppler ist nicht installiert.
+    → Windows: Poppler herunterladen und Pfad in document_loader.py setzen
+    → Linux: sudo apt install poppler-utils
+
+    Problem: "FileNotFoundError: models/document_classifier.joblib"
+    → ML-Modelle fehlen. Siehe Schritt 4.
+
+    Problem: "ModuleNotFoundError: No module named 'streamlit'"
+    → pip install streamlit  (oder pip install -r requirements.txt)
+
+    Problem: "PermissionError" beim Schreiben von case_report.xlsx
+    → Die Datei ist in Excel geöffnet. Schließen und erneut starten.
+    → Alternativ: Das Programm schreibt automatisch eine Fallback-Datei
+      mit Zeitstempel (case_report_YYYYMMDD_HHMMSS.xlsx).
+
+    Problem: Falsche Zeichenkodierung (Umlaute werden nicht erkannt)
+    → Tesseract-Sprachpaket "deu" (Deutsch) installieren:
+      Linux: sudo apt install tesseract-ocr-deu
+      Windows: Im Tesseract-Installer "German" auswählen
+
+    Problem: "ImportError" bei from src.xxx
+    → app.py muss vom Projektverzeichnis aus gestartet werden (nicht aus src/)
+    → main.py muss aus dem src/-Verzeichnis gestartet werden
+
+
+================================================================================
+ZUSAMMENFASSUNG: SCHNELLSTART
+================================================================================
+
+    # 1. Klonen
+    git clone https://github.com/<username>/klimaticket-foerderung.git
+    cd klimaticket-foerderung
+
+    # 2. System-Dependencies (Linux)
+    sudo apt install -y tesseract-ocr tesseract-ocr-deu poppler-utils
+
+    # 3. Python-Dependencies
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+
+    # 4. ML-Modelle in models/ kopieren
+
+    # 5. Cases in data/cases/ anlegen
+
+    # 6a. Batch: cd src && python main.py
+    # 6b. Web:   streamlit run app.py

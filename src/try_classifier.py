@@ -10,8 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def try_single_pdf(pdf_path: Path) -> None:
     text = extract_text_from_pdf(pdf_path)
-    doc_type = classify_document(text)
-    print(f"Datei: {pdf_path.name} -> erkannter Typ: {doc_type}")
+    doc_type, confidence = classify_document(text)
+    print(f"Datei: {pdf_path.name} -> erkannter Typ: {doc_type} (Konfidenz: {confidence:.1%})")
 
 if __name__ == "__main__":
     # Basis-Ordner absolut ausgehend von der Projektwurzel
