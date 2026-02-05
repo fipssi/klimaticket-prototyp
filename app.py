@@ -25,7 +25,8 @@ if "classified_pdfs" not in st.session_state:
 # ---------------------------------------------------------
 # Titel der Seite
 # ---------------------------------------------------------
-st.title("Klimaticket-Förderungsprototyp")
+st.title("Prototyp KI-basierte Dokumentenprüfung: KlimaTicket")
+st.markdown("Dieser Prototyp wurde im Rahmen meiner Bachelorarbeit erstellt und soll eine KI-basierte Dokumentenprüfung durchführen. Er dient der automatischen Prüfung der erforderlichen Beilagen: Rechnungen und Meldezettel.")
 
 # ---------------------------------------------------------
 # Abschnitt: Antragsdaten (Eingabeformular)
