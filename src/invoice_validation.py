@@ -207,7 +207,8 @@ def parse_form_datetime(value: str) -> Optional[datetime]:
 # Regex für Textformat-Datumsangaben: "21. Dez 2024", "01. Mär 2026", etc.
 # Erweitert auf 3-4 Buchstaben um auch "März" (ausgeschrieben) zu matchen.
 # \w matcht auch Unicode-Buchstaben wie ä, ö, ü
-DATE_PATTERN_TEXT = r"\d{1,2}\.\s*\w{3,4}\s*\d{4}"
+# [.,] akzeptiert sowohl Punkt als auch Komma (OCR-Fehler: "02, Okt" statt "02. Okt")
+DATE_PATTERN_TEXT = r"\d{1,2}[.,]\s*\w{3,4}\s*\d{4}"
 
 # Mapping: Deutsche Monatsabkürzungen → Englische (für strptime)
 # Enthält alle Varianten: mit/ohne Umlaute, verschiedene Schreibweisen
@@ -287,6 +288,9 @@ def parse_pdf_date_text(value: str | None) -> datetime | None:
 
     # Unicode normalisieren — verschiedene Kodierungen von ä, ö, ü vereinheitlichen
     v = unicodedata.normalize("NFC", value.strip())
+
+    # OCR-Fehler: Komma statt Punkt nach dem Tag ("02, Okt" → "02. Okt")
+    v = re.sub(r"(\d{1,2}),\s*", r"\1. ", v)
 
     # Monat extrahieren: zwischen Punkt und Jahr steht der Monatsname
     # "21. Dez 2024" → wir suchen "Dez"
