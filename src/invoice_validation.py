@@ -80,7 +80,7 @@ import unicodedata
 from datetime import datetime
 from typing import Tuple, Optional
 
-from utils import normalize_for_matching, _compact, _variants_for_umlaut_translit
+from src.utils import normalize_for_matching, _compact, _variants_for_umlaut_translit
 
 
 # =============================================================================
